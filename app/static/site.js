@@ -111,7 +111,7 @@
   // ---------- voice: record, Whisper writes it down, the parent checks it ----------
   document.querySelectorAll("[data-voice]").forEach((v) => {
     const box = document.getElementById(v.dataset.voice);
-    const msg = v.parentElement.querySelector(".voice-msg");
+    const msg = v.closest(".field").querySelector(".voice-msg");
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) { v.hidden = true; return; }
     const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"].find((m) => MediaRecorder.isTypeSupported?.(m)) || "";
     const bars = [...v.querySelectorAll(".wave i")];

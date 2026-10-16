@@ -19,6 +19,7 @@
         <textarea id="desc" name="description" required minlength="10" placeholder="e.g. Little girl about 4, yellow dress, crying, says her name is Sara and her mama was buying shoes.">{{ description or "" }}</textarea>
         {% include "_voice.html" %}
       </div>
+      <p class="voice-msg" role="status" aria-live="polite"></p>
       <div class="hints" aria-label="Add details">
         <button type="button" class="hint-chip" data-target="desc" data-hint="Age about:">+ Age</button>
         <button type="button" class="hint-chip" data-target="desc" data-hint="Wearing:">+ Clothes</button>
@@ -54,4 +55,4 @@
 </div>
 {% endblock %}
 {% block footer %}{% endblock %}
-{% block scripts %}<script src="/static/site.js?v=6"></script>{% endblock %}
+{% block scripts %}<script src="/static/site.js?v=7"></script>{% endblock %}

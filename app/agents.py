@@ -111,7 +111,9 @@ def clean_case(data: dict) -> dict:
 def code_checks(report: str, case: dict) -> list[dict]:
     """Checks that don't need a model."""
     issues = []
-    ages = {int(n) for n in re.findall(r"\b(\d{1,2})\s*(?:years?|yrs?|y/o|saal|sal)\b", report, re.I)}
+    ages = {int(n) for n in re.findall(r"\b(\d{1,2})\s*(?:-?\s*years?|yrs?|y/o|saal|sal)\b", report, re.I)}
+    ages |= {int(n) for n in re.findall(r"\b(?:turned|aged?|age:?|is just|is only|only)\s+(\d{1,2})\b", report, re.I)}
+    ages = {a for a in ages if a <= 17}
     if len(ages) > 1:
         issues.append({"field": "age_years", "problem": f"The report mentions more than one age: {', '.join(map(str, sorted(ages)))}.", "quote": ""})
     if case.get("age_years") is not None and ages and case["age_years"] not in ages:

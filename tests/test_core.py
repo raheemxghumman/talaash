@@ -13,6 +13,13 @@ def test_clean_case_drops_bad_values():
     assert case["minutes_ago"] is None
 
 
+def test_code_checks_hear_a_corrected_age():
+    report = "My son Ali is 6 years old. Sorry, he just turned 7. Red t-shirt."
+    issues = agents.code_checks(report, {"age_years": 7, "clothing": ["red t-shirt"]})
+    assert [i["field"] for i in issues] == ["age_years"]
+    assert "more than one age: 6, 7" in issues[0]["problem"]
+
+
 def test_code_checks_flag_two_ages_and_missing_clothing():
     report = "My son is 6 years old. He looks about 10 years old."
     issues = agents.code_checks(report, {"age_years": 6, "clothing": []})
