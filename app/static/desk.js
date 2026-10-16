@@ -699,6 +699,7 @@
         const note = await ask(`Close case #${c.id}?`, found ? "Use this only if the child was handed to police or another service. Staff alerts will be withdrawn." : "Every alert will be edited to resolved, the photo deleted and the child’s details removed.",
           found ? "Handed to the police liaison." : "Reunited with parent at the security desk.", "Close case");
         if (note === null) return;
+        btn.disabled = true; btn.textContent = "Closing…";
         await post(`/api/cases/${c.id}/close`, { note });
         toast(`Case #${c.id} closed. Every alert withdrawn.`);
         await refresh(); setTab("closed"); select(`c:${c.id}`, false);
@@ -743,7 +744,7 @@
       } else if (what === "m-reunite") {
         const note = await ask("Reunite and close both cases?", "Both cases close, every alert is withdrawn and the photo is deleted.", "Reunited with the parent at the security desk.", "Reunite");
         if (note === null) return;
-        btn.disabled = true;
+        btn.disabled = true; btn.textContent = "Reuniting…";
         await post(`/api/matches/${item.id}/reunite`, { note, identity_checked: true });
         reunitedFx();
         toast(`Reunited. Cases #${item.missing_id} and #${item.found_id} closed, every alert withdrawn.`);

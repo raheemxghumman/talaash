@@ -435,11 +435,15 @@ def _finish(case: dict, officer: str, note: str):
            officer, case["id"], case["id"])
     # sightings nobody decided on are settled, so they don't sit in the queue forever
     db.run("update sightings set decision = 'closed', decided_by = 'Closer', decided_at = now() where case_id = %s and decision is null", case["id"])
-    notify.withdraw_all(case, note)
-    if case.get("photo_id"):
-        photos.delete(case["photo_id"])
-        db.log(case["id"], "Closer", "Deleted the photo")
-    _later(build_report, case["id"])
+
+    def clean_up():
+        # Discord edits are slow, so they run after the officer gets an answer; the case is already closed.
+        notify.withdraw_all(case, note)
+        if case.get("photo_id"):
+            photos.delete(case["photo_id"])
+            db.log(case["id"], "Closer", "Deleted the photo")
+        build_report(case["id"])
+    _later(clean_up)
     return True
 
 

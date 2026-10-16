@@ -270,7 +270,7 @@ dialog { background: var(--card); color: var(--ink); border: 0; border-radius: 1
 dialog::backdrop { background: rgba(19, 32, 47, .35); backdrop-filter: blur(2px); }
 dialog h3 { margin: 0 0 6px; font: 600 20px var(--display); }
 dialog p { margin: 0 0 12px; color: var(--muted); }
-dialog textarea { width: 100%; font: 400 14.5px var(--sans); padding: 10px; border-radius: 10px; border: 1px solid var(--line-2); resize: vertical; }
+dialog textarea { background: #fff; color: var(--ink); width: 100%; font: 400 14.5px var(--sans); padding: 10px; border-radius: 10px; border: 1px solid var(--line-2); resize: vertical; }
 .dlg-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 
 @media (max-width: 1280px) {
