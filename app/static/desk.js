@@ -24,7 +24,7 @@
     warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>',
     ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>',
   };
-  const kindOf = (actor) => AI.test(actor) ? "ai" : actor === "Desk" || actor === "Parent" ? "sys" : "human";
+  const kindOf = (actor) => AI.test(actor) ? "ai" : ["Desk", "Parent", "Checks"].includes(actor) ? "sys" : "human";
 
   function toast(text, bad) {
     const t = $("#toast");
@@ -189,6 +189,8 @@
 
   function reviewView(c) {
     const x = c.extracted || {}, v = c.verification || { issues: [] }, issues = v.issues || [];
+    const signals = v.signals || [], warns = signals.filter((sg) => sg.level === "warn");
+    const needsAck = issues.length || warns.length;
     const flagged = new Set(issues.map((i) => i.field));
     const draft = drafts[c.id] || {};
     const fields = FIELDS.map(([k, label, wide]) => {
@@ -208,14 +210,18 @@
           <div class="contact">${c.reporter_name ? `<span>${esc(c.reporter_name)}</span>` : ""}${c.reporter_phone ? `<span>${esc(c.reporter_phone)}</span>` : ""}${!c.reporter_name && !c.reporter_phone ? '<span>No contact given</span>' : ""}</div></div>
         <div class="box"><h4>Case details <span class="by">edit before approving</span></h4><div class="fields">${fields}</div></div>
       </div>
+      <div class="box"><h4>Report history <span class="by">past reports, phone number, duplicates</span></h4>
+        ${signals.length ? `<ul class="issues signals">${signals.map((sg) => `<li class="${sg.level}">${sg.level === "warn" ? icon.warn : icon.human}<div>${esc(sg.text)}</div></li>`).join("")}</ul>` : ""}
+        ${!warns.length ? `<div class="ok-line">${icon.ok}No warning signs: no rejected or duplicate reports from this number.</div>` : ""}
+      </div>
       <div class="box"><h4>Checker <span class="by">${esc(v.checker || "")}</span></h4>
         ${issues.length ? `<ul class="issues">${issues.map((i) => `<li>${icon.warn}<div><b>${esc(i.field)}</b> ${esc(i.problem)}${i.quote ? `<q>“${esc(i.quote)}”</q>` : ""}</div></li>`).join("")}</ul>`
           : `<div class="ok-line">${icon.ok}Every detail matches the parent’s words.</div>`}
       </div>
       <div class="decide">
-        ${issues.length ? `<label class="ack"><input type="checkbox" id="ack" ${draft.__ack ? "checked" : ""}> I’ve checked the flagged details</label>` : '<span style="margin-right:auto"></span>'}
+        ${needsAck ? `<label class="ack"><input type="checkbox" id="ack" ${draft.__ack ? "checked" : ""}> I’ve checked the warnings${warns.length ? " and spoken to the reporter" : ""}</label>` : '<span style="margin-right:auto"></span>'}
         <button class="btn ghost" data-act="reject">Reject</button>
-        <button class="btn signal" data-act="approve" ${issues.length && !draft.__ack ? "disabled" : ""}>Approve broadcast <span class="k">A</span></button>
+        <button class="btn signal" data-act="approve" ${needsAck && !draft.__ack ? "disabled" : ""}>Approve broadcast <span class="k">A</span></button>
       </div>`;
   }
 
@@ -371,40 +377,17 @@
     }
   }
 
-  // ---------- map ----------
-  const LAYOUT = {
-    "Gate 3": [12, 12, 104, 60], "Cinema Level": [124, 12, 264, 60],
-    "Kids Play Area": [12, 80, 104, 100], "Food Court": [124, 80, 180, 100], "Gate 2": [312, 80, 76, 100],
-    "Parking": [12, 188, 104, 100], "Main Entrance": [124, 188, 150, 100], "Gate 1": [282, 188, 106, 100],
-  };
-  const center = (z) => { const r = LAYOUT[z]; return r ? [r[0] + r[2] / 2, r[1] + r[3] / 2 + 6] : [200, 150]; };
-  const jitter = (id, spread) => [((id * 37) % 11 - 5) * spread, ((id * 53) % 9 - 4) * spread];
-
+  // ---------- map (drawn in 3D by venuemap.js) ----------
   function renderMap() {
     if (!data) return;
-    const active = data.cases.filter((c) => c.status === "active");
-    const selCase = (() => { const it = findSel(); if (!it) return null; return sel.startsWith("s:") ? caseById(it.case_id) : it; })();
-    const wide = new Set();
-    active.forEach((c) => { if (c.sighted_at) return; if (c.stage >= 1) Object.keys(LAYOUT).forEach((z) => wide.add(z)); else wide.add(c.zone); });
-    let svg = Object.entries(LAYOUT).map(([z, [x, y, w, h]]) =>
-      `<g class="zone ${wide.has(z) ? "wide" : ""} ${selCase && selCase.zone === z ? "sel" : ""}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8"/><text x="${x + 8}" y="${y + 15}">${z}</text></g>`).join("");
-    const pins = {};
-    active.forEach((c) => { const [cx, cy] = center(c.zone); const [jx, jy] = jitter(c.id, 3); pins[c.id] = [cx + jx, cy + jy]; });
-    const shownSights = data.sightings.filter((s) => (!s.decision && s.route !== "unmatched") || (selCase && s.case_id === selCase.id));
-    shownSights.forEach((s) => {
-      const [cx, cy] = center(s.zone); const [jx, jy] = jitter(s.id + 7, 4);
-      const p = [cx + jx, cy + jy];
-      if (s.case_id && pins[s.case_id] && !s.decision) svg += `<path class="link" d="M${pins[s.case_id][0]},${pins[s.case_id][1]} Q${(p[0] + pins[s.case_id][0]) / 2},${Math.min(p[1], pins[s.case_id][1]) - 30} ${p[0]},${p[1]}"/>`;
-      s._p = p;
-    });
-    shownSights.forEach((s) => (svg += `<circle class="spot ${s.decision ? "done" : s.route === "review" ? "unsure" : ""}" cx="${s._p[0]}" cy="${s._p[1]}" r="5"><title>Sighting #${s.id}: ${esc(s.text)}</title></circle>`));
-    active.forEach((c) => {
-      const [x, y] = pins[c.id];
-      svg += `<g class="pin" data-case="${c.id}"><circle class="halo" cx="${x}" cy="${y}" r="11"/><circle class="core" cx="${x}" cy="${y}" r="11"/><text x="${x}" y="${y + 3}" text-anchor="middle">${c.id}</text></g>`;
-    });
-    $("#map").innerHTML = svg;
-    $("#map").querySelectorAll(".pin").forEach((g) => g.addEventListener("click", () => select(`c:${g.dataset.case}`)));
+    const it = findSel();
+    const selCase = !it ? null : sel.startsWith("s:") ? it.case_id : it.id;
+    document.dispatchEvent(new CustomEvent("desk:data", { detail: { data, selCase } }));
   }
+  document.addEventListener("desk:map-ready", renderMap);
+  document.addEventListener("desk:select", (e) => select(e.detail.key));
+  document.addEventListener("desk:toast", (e) => toast(e.detail.text, e.detail.bad));
+  document.addEventListener("desk:refresh", () => refresh());
 
   // ---------- feed ----------
   function renderFeed() {
@@ -468,8 +451,8 @@
   document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => { setTab(b.dataset.tab); }));
   document.querySelectorAll(".stat").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.filter)));
   $("#items").addEventListener("click", (e) => { const li = e.target.closest(".item"); if (li) select(li.dataset.key, false); });
-  document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => {
-    feedFilter = b.dataset.feed; document.querySelectorAll(".seg button").forEach((x) => x.classList.toggle("on", x === b)); $("#feed").dataset.html = ""; renderFeed();
+  document.querySelectorAll(".feed-card .seg button").forEach((b) => b.addEventListener("click", () => {
+    feedFilter = b.dataset.feed; document.querySelectorAll(".feed-card .seg button").forEach((x) => x.classList.toggle("on", x === b)); $("#feed").dataset.html = ""; renderFeed();
   }));
   $("#feed").addEventListener("click", (e) => { const r = e.target.closest(".ref"); if (r) select(`c:${r.dataset.case}`); });
   document.addEventListener("keydown", (e) => {

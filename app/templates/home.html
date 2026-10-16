@@ -22,12 +22,18 @@
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Alerts withdrawn once found</li>
       </ul>
     </div>
-    <div class="stage reveal d2" id="stage" aria-label="Animated venue map showing a search widening from the food court">
-      <canvas id="venue"></canvas>
-      <div class="chip-float chip-a" data-phase="0"><span class="pip"></span><span><b>Case #12</b> · Food Court</span><span class="mono">00:41</span></div>
-      <div class="chip-float chip-b" data-phase="1"><span class="pip"></span><span><b>Officer approved</b> · zone alert out</span></div>
-      <div class="chip-float chip-c" data-phase="2"><span class="pip"></span><span><b>Sighting at Gate 3</b> · 86% match</span></div>
-      <div class="chip-float chip-d" data-phase="3"><span class="pip"></span><span><b>Found</b> · alerts withdrawn</span></div>
+    <div class="hero-visual reveal d2">
+      <div class="stage" id="stage" aria-label="A miniature mall where a lost-child search plays out: report at the food court, alert to every zone, sighting at Gate 3, child returned">
+        <canvas id="venue"></canvas>
+        <div class="chip-float chip-a" data-phase="0"><span class="pip"></span><span><b>Case #12</b> · Food Court</span><span class="mono">00:00</span></div>
+        <div class="chip-float chip-b" data-phase="1"><span class="pip"></span><span><b>Officer approved</b> · zone alert out</span></div>
+        <div class="chip-float chip-c" data-phase="3"><span class="pip"></span><span><b>Sighting at Gate 3</b> · 86% match</span></div>
+        <div class="chip-float chip-d" data-phase="4"><span class="pip"></span><span><b>Found</b> · alerts withdrawn</span></div>
+      </div>
+      <div class="story" aria-hidden="true">
+        <div class="story-track"><i class="story-fill"></i></div>
+        <ol><li>Parent reports</li><li>Officer approves</li><li>Every zone, exits watched</li><li>Guard spots her</li><li>Back with family</li></ol>
+      </div>
     </div>
   </section>
 
@@ -138,5 +144,5 @@
 {% endblock %}
 {% block scripts %}
 <script src="/static/site.js?v=3"></script>
-<script type="module" src="/static/venue3d.js?v=3"></script>
+<script type="module" src="/static/venue3d.js?v=4"></script>
 {% endblock %}

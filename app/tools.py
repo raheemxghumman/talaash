@@ -5,7 +5,7 @@ sightings or close cases: those stay with the human desk officer."""
 
 from datetime import datetime, timezone
 
-from app import agents, db, desk
+from app import config, db, desk, venue
 
 
 def _summary(case: dict) -> dict:
@@ -23,13 +23,14 @@ def _summary(case: dict) -> dict:
 
 
 def list_zones() -> list[str]:
-    return agents.ZONES
+    return venue.names()
 
 
 def list_open_cases(zone: str | None = None) -> list[dict]:
     """Active searches only. Reports still waiting for the officer are not shared."""
     rows = db.all("select * from cases where status = 'active' order by id desc")
     cases = [_summary(c) for c in rows]
+    zone = venue.match_name(zone) if zone else None
     if zone:
         cases.sort(key=lambda c: c["last_seen_zone"] != zone)
     return cases
@@ -43,15 +44,16 @@ def get_case(case_id: int) -> dict:
         return {"case_id": case_id, "status": "closed", "note": "The child was found. Stand down."}
     events = db.all("select actor, action, at from events where case_id = %s order by id desc limit 6", case_id)
     return {**_summary(case), "status": "active",
-            "recent": [f"{e['at']:%H:%M} {e['actor']}: {e['action']}" for e in reversed(events)]}
+            "recent": [f"{e['at'].astimezone(config.VENUE_TZ):%H:%M} {e['actor']}: {e['action']}" for e in reversed(events)]}
 
 
 def report_sighting(description: str, zone: str, reporter: str = "") -> dict:
     description = (description or "").strip()[:600]
     if len(description) < 5:
         return {"error": "Describe what you can see."}
-    if zone not in agents.ZONES:
-        return {"error": f"Unknown zone. Use one of: {', '.join(agents.ZONES)}."}
+    zone = venue.match_name(zone)
+    if not zone:
+        return {"error": f"Unknown zone. Use one of: {', '.join(venue.names())}."}
     result = desk.new_sighting(description, zone, reporter[:60])
     route = {
         "likely": "Likely match. The desk officer has been alerted and will confirm.",
@@ -59,3 +61,14 @@ def report_sighting(description: str, zone: str, reporter: str = "") -> dict:
         "unmatched": "No open case matches. Logged.",
     }[result["route"]]
     return {"sighting_id": result["id"], "case_id": result["case_id"], "score": result["score"], "outcome": route}
+
+
+def sighting_status(reporter: str) -> list[dict]:
+    """What the desk decided about the latest sightings this person filed."""
+    rows = db.all("""select id, case_id, zone, text, route, decision, created_at from sightings
+                     where reporter = %s order by id desc limit 5""", reporter[:60])
+    outcome = {"confirmed": "Confirmed by the desk officer", "dismissed": "Dismissed by the desk officer"}
+    waiting = {"likely": "Likely match, waiting for the desk officer", "review": "Possible match, waiting for the desk officer",
+               "unmatched": "Did not match any open case"}
+    return [{"sighting_id": r["id"], "case_id": r["case_id"], "zone": r["zone"], "what_you_said": r["text"][:120],
+             "filed": f"{r['created_at'].astimezone(config.VENUE_TZ):%H:%M}", "status": outcome.get(r["decision"]) or waiting[r["route"]]} for r in rows]

@@ -18,8 +18,11 @@ Built in about a day for Agentika 2.0 at NaSCon'26. Theme: *Human + AI: Better T
 | 4 | **Sighting matcher** (Groq) | Scores each guard sighting. 75%+ alerts the officer to confirm; 45–75% goes to a human review queue. |
 | 5 | **Watcher** | Widens the alert to every zone, then escalates to police, unless a sighting is confirmed. |
 | 6 | **Desk officer → Closer** | Only a person can close a case. Every Discord alert is then edited to "RESOLVED" and the child's details removed. |
-| – | **Guard assistant** (tool-using agent in Discord) | Guards chat with it; it lists cases, reads a case or files a sighting. It has no tool to approve or close anything. |
+| – | **Report checks** (code, no model) | Before approval the officer sees warning signs no model can know: rejected reports from the same phone, repeat reports, a likely duplicate of an open case, a sudden burst of reports. The Verifier also flags reports that read like a joke or test, or mention a custody dispute. |
+| – | **Guard assistant** (tool-using agent in Discord) | Guards chat with it; it lists cases, reads a case, files a sighting and tells a guard what the desk decided about their sightings. It remembers the last few messages, so a guard can give the zone in a follow-up. It has no tool to approve or close anything. |
 | – | **MCP server** at `/mcp` | Any MCP client can use the same four tools, behind a bearer token. |
+
+The desk has a 3D venue map with open cases, sightings and the search area. From the bigger view the officer can add, move, resize, rename or remove zones; the forms, the guard assistant and the MCP server use the new zone list straight away.
 
 Parents get a private live status page that updates as the search moves on, with progress only and no details.
 

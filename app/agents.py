@@ -6,8 +6,6 @@ import re
 
 from app.llm import GROQ_OTHER_FAMILY, LLMError, gemini_json, groq_json
 
-ZONES = ["Main Entrance", "Food Court", "Kids Play Area", "Cinema Level", "Gate 1", "Gate 2", "Gate 3", "Parking"]
-
 INTAKE_SYSTEM = """You turn a frightened parent's report about a lost child into a case record for venue security.
 The report may be in any language or mixed languages. Write every value in English.
 
@@ -35,6 +33,7 @@ A wrong detail sends guards looking for the wrong child, so be strict.
 
 PARENT'S REPORT (the only source of truth):
 <<<{report}>>>
+The parent also picked this zone on the form, so it counts as stated: {zone}
 
 EXTRACTED CASE:
 {extracted}
@@ -44,6 +43,10 @@ Check every non-empty field against the report. Report a problem when:
 - a value contradicts the report,
 - the report contradicts itself about something important (e.g. two different ages or shirt colours),
 - an important detail in the report was left out.
+- the text does not read like a real report of a missing child (a joke, a test, abuse, or it describes an adult).
+  Use field "report" for this.
+- the reporter says they are not the parent or guardian, or mentions custody, a dispute, or the other parent
+  taking the child. Use field "reporter" and say the officer should check who they are.
 
 Return JSON:
 {{
@@ -118,8 +121,8 @@ def code_checks(report: str, case: dict) -> list[dict]:
     return issues
 
 
-def verify(report: str, case: dict) -> dict:
-    prompt = VERIFY_PROMPT.format(report=report, extracted=json.dumps(case, indent=2))
+def verify(report: str, case: dict, zone: str = "not given") -> dict:
+    prompt = VERIFY_PROMPT.format(report=report, zone=zone, extracted=json.dumps(case, indent=2))
     checker = "code only"
     issues = []
     try:

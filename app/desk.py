@@ -1,6 +1,7 @@
 """The workflow: agents propose, the desk officer decides."""
 
 import os
+import re
 import secrets
 import threading
 import time
@@ -26,7 +27,7 @@ def new_case(report: str, zone: str, reporter_name: str, reporter_phone: str) ->
     if result["ok"]:
         case = result["case"]
         db.log(case_id, "Intake agent", "Built the case record", result["model"])
-        check = agents.verify(report, case)
+        check = agents.verify(report, case, zone)
         verdict = "No problems found" if check["ok"] else f"Flagged {len(check['issues'])} issue(s) for the officer"
         db.log(case_id, "Verifier agent", verdict, check["checker"])
     else:
@@ -36,6 +37,11 @@ def new_case(report: str, zone: str, reporter_name: str, reporter_phone: str) ->
         }]}
         db.log(case_id, "Intake agent", "Unavailable, case passed to the officer as is", result["error"])
 
+    check["signals"] = report_signals(case_id, zone, reporter_name, reporter_phone, case)
+    warns = sum(1 for sig in check["signals"] if sig["level"] == "warn")
+    db.log(case_id, "Checks", f"{warns} warning sign(s) for the officer" if warns else "No warning signs in past reports",
+           "; ".join(sig["text"] for sig in check["signals"])[:300] or None)
+
     x = case
     urgent = (x.get("age_years") is not None and x["age_years"] < 8) or bool(x.get("special_needs"))
     db.run(
@@ -44,6 +50,53 @@ def new_case(report: str, zone: str, reporter_name: str, reporter_phone: str) ->
     )
     db.log(case_id, "Desk", "Waiting for officer approval before any alert goes out")
     return case_id, token
+
+
+def phone_key(phone: str) -> str:
+    digits = re.sub(r"\D", "", phone or "")
+    return digits[-10:] if len(digits) >= 7 else ""
+
+
+def report_signals(case_id: int, zone: str, name: str, phone: str, case: dict) -> list[dict]:
+    """Warning signs from past reports that no model can see: repeat callers, rejected
+    reports, duplicates and bursts. They don't block anything; the officer decides."""
+    signals = []
+    key = phone_key(phone)
+    if key:
+        mine = [r for r in db.all("""select id, status, created_at, reporter_phone from cases
+                                     where id <> %s and reporter_phone is not null and created_at > now() - interval '30 days'
+                                     order by id desc""", case_id) if phone_key(r["reporter_phone"]) == key]
+        rejected = [r["id"] for r in mine if r["status"] == "rejected"]
+        open_ = [r["id"] for r in mine if r["status"] in ("review", "active")]
+        recent = [r for r in mine if (datetime.now(timezone.utc) - r["created_at"]).total_seconds() < 86400]
+        if rejected:
+            signals.append({"level": "warn", "text": f"This phone number had {len(rejected)} report(s) rejected in the last 30 days "
+                            f"({', '.join(f'#{i}' for i in rejected[:3])})."})
+        if open_:
+            signals.append({"level": "warn", "text": f"This phone number already has open case {', '.join(f'#{i}' for i in open_[:3])}. "
+                            "It may be a duplicate, or a second child."})
+        if len(recent) >= 3:
+            signals.append({"level": "warn", "text": f"{len(recent) + 1} reports from this phone number in 24 hours."})
+    else:
+        signals.append({"level": "info", "text": "No phone number given. Meet the reporter at the desk before approving."})
+
+    x = case or {}
+    words = lambda items: {w for item in items or [] for w in re.findall(r"[a-z]{3,}", item.lower())}
+    mine_words = words(x.get("clothing"))
+    for other in db.all("""select id, extracted from cases where id <> %s and status in ('review', 'active')
+                           and created_at > now() - interval '3 hours'""", case_id):
+        o = other["extracted"] or {}
+        same_name = x.get("child_name") and o.get("child_name") and x["child_name"].lower() == o["child_name"].lower()
+        shared = mine_words & words(o.get("clothing"))
+        same_kid = x.get("age_years") is not None and x.get("age_years") == o.get("age_years") and x.get("gender") == o.get("gender") and shared
+        if same_name or same_kid:
+            why = f"same name {x['child_name']}" if same_name else f"same age and {', '.join(sorted(shared))}"
+            signals.append({"level": "warn", "text": f"Looks like open case #{other['id']} ({why}). Someone may have reported this child already."})
+
+    burst = db.one("select count(*) as n from cases where created_at > now() - interval '10 minutes'")["n"]
+    if burst >= 5:
+        signals.append({"level": "warn", "text": f"{burst} reports in the last 10 minutes across the venue. Check for a prank before approving."})
+    return signals
 
 
 def public_status(token: str):

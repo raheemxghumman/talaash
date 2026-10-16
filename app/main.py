@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.routing import Route
 
-from app import agents, config, db, desk, guard_bot, mcp_server
+from app import config, db, desk, guard_bot, mcp_server, venue
 
 BASE = Path(__file__).parent
 mcp_app = mcp_server.asgi_app()
@@ -20,6 +20,7 @@ mcp_app = mcp_server.asgi_app()
 @asynccontextmanager
 async def lifespan(_app):
     db.init()
+    venue.init()
     desk.start_watcher()
     guard_bot.start()
     async with mcp_server.mcp.session_manager.run():
@@ -88,16 +89,16 @@ def home(request: Request):
 
 @app.get("/report", response_class=HTMLResponse)
 def report_page(request: Request):
-    return templates.TemplateResponse(request, "report.html", {"zones": agents.ZONES})
+    return templates.TemplateResponse(request, "report.html", {"zones": venue.names()})
 
 
 @app.post("/report", response_class=HTMLResponse)
 def report_submit(request: Request, description: str = Form(...), zone: str = Form(...),
                   reporter_name: str = Form(""), reporter_phone: str = Form("")):
     description = description.strip()[:2000]
-    if len(description) < 15 or zone not in agents.ZONES:
+    if len(description) < 15 or zone not in venue.names():
         return templates.TemplateResponse(request, "report.html", {
-            "zones": agents.ZONES, "error": "Please describe your child in a sentence or two and pick where you last saw them.",
+            "zones": venue.names(), "error": "Please describe your child in a sentence or two and pick where you last saw them.",
             "description": description, "zone": zone,
         }, status_code=422)
     case_id, token = desk.new_case(description, zone, reporter_name.strip()[:80], reporter_phone.strip()[:30])
@@ -122,15 +123,15 @@ def status_api(token: str):
 
 @app.get("/sighting", response_class=HTMLResponse)
 def sighting_page(request: Request):
-    return templates.TemplateResponse(request, "sighting.html", {"zones": agents.ZONES})
+    return templates.TemplateResponse(request, "sighting.html", {"zones": venue.names()})
 
 
 @app.post("/sighting", response_class=HTMLResponse)
 def sighting_submit(request: Request, text: str = Form(...), zone: str = Form(...), reporter: str = Form("")):
     text = text.strip()[:600]
-    if len(text) < 5 or zone not in agents.ZONES:
+    if len(text) < 5 or zone not in venue.names():
         return templates.TemplateResponse(request, "sighting.html", {
-            "zones": agents.ZONES, "error": "Describe what you saw and pick your zone.", "text": text, "zone": zone,
+            "zones": venue.names(), "error": "Describe what you saw and pick your zone.", "text": text, "zone": zone,
         }, status_code=422)
     result = desk.new_sighting(text, zone, reporter.strip()[:60])
     return templates.TemplateResponse(request, "sighting_done.html", {"result": result, "zone": zone})
@@ -143,7 +144,7 @@ def desk_page(request: Request):
     name = officer(request)
     if not name:
         return RedirectResponse("/login", status_code=303)
-    return templates.TemplateResponse(request, "desk.html", {"officer": name, "steps": desk.STEPS, "zones": agents.ZONES})
+    return templates.TemplateResponse(request, "desk.html", {"officer": name, "steps": desk.STEPS})
 
 
 def _iso(value):
@@ -167,7 +168,8 @@ def desk_state(request: Request):
     return {
         "now": datetime.now(timezone.utc).isoformat(),
         "steps": desk.STEPS,
-        "zones": agents.ZONES,
+        "zones": venue.zones(),
+        "kinds": list(venue.KINDS),
         "cases": clean(cases),
         "sightings": clean(sightings),
         "events": clean(events),
@@ -210,6 +212,44 @@ def decide(sighting_id: int, decision: str, request: Request):
         raise HTTPException(404)
     if not desk.decide_sighting(sighting_id, name, decision):
         raise HTTPException(409, "Already decided")
+    return {"ok": True}
+
+
+# ---------- venue zones ----------
+
+def _venue_call(fn, *args):
+    try:
+        return fn(*args)
+    except venue.VenueError as exc:
+        raise HTTPException(422, str(exc))
+
+
+@app.post("/api/zones")
+async def zone_add(request: Request):
+    name = require_officer(request)
+    body = await request.json()
+    zone = _venue_call(venue.add, body.get("name"), body.get("kind") or "area", body.get("w") or 2.4, body.get("d") or 2)
+    db.log(None, name, f"Added {zone['name']} to the venue map")
+    return zone
+
+
+@app.patch("/api/zones/{zone_id}")
+async def zone_edit(zone_id: int, request: Request):
+    name = require_officer(request)
+    body = await request.json()
+    old, new = _venue_call(venue.update, zone_id, body)
+    if old["name"] != new["name"]:
+        db.log(None, name, f"Renamed zone {old['name']} to {new['name']}")
+    elif old["kind"] != new["kind"] or old["w"] != new["w"] or old["d"] != new["d"]:
+        db.log(None, name, f"Changed zone {new['name']}")
+    return new
+
+
+@app.delete("/api/zones/{zone_id}")
+def zone_remove(zone_id: int, request: Request):
+    name = require_officer(request)
+    row = _venue_call(venue.remove, zone_id)
+    db.log(None, name, f"Removed {row['name']} from the venue map")
     return {"ok": True}
 
 
