@@ -21,7 +21,7 @@ const C = {
   signal: new THREE.Color("#e2552d"), signalDeep: new THREE.Color("#c2401c"), police: new THREE.Color("#7a2412"),
   wide: new THREE.Color("#f9d9cb"), sky: new THREE.Color("#356c9c"), skySoft: new THREE.Color("#d8e6f3"),
   amber: new THREE.Color("#b97d12"), grey: new THREE.Color("#9fb0c2"), ink: new THREE.Color("#13202f"),
-  edge: new THREE.Color("#cfc5b1"), hover: new THREE.Color("#ffffff"),
+  edge: new THREE.Color("#cfc5b1"), hover: new THREE.Color("#ffffff"), sage: new THREE.Color("#2f7d6b"),
 };
 
 const wrap = $("#map-wrap");
@@ -173,7 +173,7 @@ function flyTo(view, instant) {
 // ---------- markers ----------
 const jitter = (id, spread) => [(((id * 37) % 11) - 5) / 5 * spread, (((id * 53) % 9) - 4) / 4 * spread];
 const zoneByName = (name) => [...zoneObjs.values()].find((o) => o.zone.name === name);
-const stageColor = (c) => (c.sighted_at ? C.sky : [C.signal, C.signalDeep, C.police][c.stage] || C.signal);
+const stageColor = (c) => (c.kind === "found" ? C.sage : c.sighted_at ? C.sky : [C.signal, C.signalDeep, C.police][c.stage] || C.signal);
 
 function ring(color, radius, y) {
   const m = new THREE.Mesh(new THREE.RingGeometry(radius * 0.86, radius, 64), new THREE.MeshBasicMaterial({ color, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
@@ -219,14 +219,14 @@ function buildMarkers() {
       head.position.y = 0.95 + Math.sin(t / 420 + phase * 6) * 0.06;
       tipCone.position.y = head.position.y - 0.33;
       const p = (t / 1700 + phase) % 1;
-      pulse.scale.setScalar(1 + p * (c.sighted_at ? 1.5 : 3.2));
+      pulse.scale.setScalar(1 + p * (c.sighted_at || c.kind === "found" ? 1.5 : 3.2));
       pulse.material.opacity = (1 - p) * 0.7;
     });
     beaconTop[c.id] = g.position.clone().add(new THREE.Vector3(0, 1.3, 0));
     const el = document.createElement("button");
-    el.className = `pin-tag${selected ? " sel" : ""}${c.sighted_at ? " sighted" : ""} st${c.stage}`;
+    el.className = `pin-tag${selected ? " sel" : ""}${c.sighted_at ? " sighted" : ""}${c.kind === "found" ? " found" : ""} st${c.stage}`;
     el.dataset.case = c.id;
-    el.title = `Case #${c.id} · ${c.zone}`;
+    el.title = c.kind === "found" ? `Found child #${c.id} · with a finder at ${c.zone}` : `Case #${c.id} · ${c.zone}`;
     el.textContent = `#${c.id}`;
     el.addEventListener("click", () => emit("desk:select", { key: `c:${c.id}` }));
     labelLayer.appendChild(el);
@@ -272,6 +272,7 @@ function zoneStatus() {
   const active = d.cases.filter((c) => c.status === "active");
   active.forEach((c) => {
     out.get(c.zone)?.cases.push(c.id);
+    if (c.kind === "found") { const v = out.get(c.zone); if (v) v.found = (v.found || 0) + 1; return; }
     if (c.sighted_at) return;
     if (c.stage >= 1) out.forEach((v) => (v.wide = true));
     else if (out.get(c.zone)) out.get(c.zone).wide = true;
@@ -338,6 +339,7 @@ function showTip(id, e) {
   const o = zoneObjs.get(id);
   const st = status.get(o.zone.name) || { cases: [], sightings: 0, wide: false };
   const lines = [];
+  if (st.found) lines.push(`<span class="t-found">${st.found} found child${st.found > 1 ? "ren" : ""} waiting with a finder</span>`);
   lines.push(st.cases.length ? `<span class="t-case">${st.cases.length} open case${st.cases.length > 1 ? "s" : ""}: ${st.cases.map((n) => `#${n}`).join(", ")}</span>` : "No open case here");
   if (st.sightings) lines.push(`<span class="t-sight">${st.sightings} sighting${st.sightings > 1 ? "s" : ""} to check</span>`);
   if (st.wide) lines.push("Inside the search area");

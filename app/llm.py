@@ -5,6 +5,7 @@ the next one when a key is rate limited or rejected. Callers get parsed JSON bac
 or LLMError if every key and model failed.
 """
 
+import base64
 import itertools
 import json
 import re
@@ -170,5 +171,86 @@ def groq_chat(messages: list, tools: list, budget=40):
                 r.raise_for_status()
                 return r.json()["choices"][0]["message"]
             except (httpx.HTTPError, KeyError) as exc:
+                errors.append(f"{model}: {type(exc).__name__}")
+    raise LLMError("; ".join(errors[-4:]) or "no Groq keys configured")
+
+
+def gemini_vision_json(prompt: str, image: bytes, mime: str = "image/jpeg", budget=40):
+    """Like gemini_json, with one image sent alongside the prompt."""
+    errors = []
+    end = time.time() + budget
+    data = base64.b64encode(image).decode()
+    for model in config.GEMINI_MODELS:
+        for key in gemini_keys.ordered():
+            if time.time() > end:
+                raise LLMError("; ".join(errors[-4:] + ["out of time"]))
+            try:
+                r = httpx.post(
+                    GEMINI_URL.format(model=model),
+                    headers={"x-goog-api-key": key},
+                    json={
+                        "contents": [{"parts": [{"inline_data": {"mime_type": mime, "data": data}}, {"text": prompt}]}],
+                        "generationConfig": {"temperature": 0.1, "responseMimeType": "application/json"},
+                    },
+                    timeout=TIMEOUT,
+                )
+                if r.status_code == 429:
+                    gemini_keys.rest(key, 60)
+                    errors.append(f"{model}: rate limited")
+                    continue
+                if r.status_code == 503:
+                    errors.append(f"{model}: busy")
+                    continue
+                if r.status_code in (401, 403):
+                    gemini_keys.rest(key, 3600)
+                    errors.append(f"{model}: key rejected")
+                    continue
+                if r.status_code == 404:
+                    errors.append(f"{model}: model unavailable")
+                    break
+                r.raise_for_status()
+                text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+                return parse_json(text), model
+            except (httpx.HTTPError, json.JSONDecodeError, KeyError, IndexError) as exc:
+                errors.append(f"{model}: {type(exc).__name__}")
+    raise LLMError("; ".join(errors[-4:]) or "no Gemini keys configured")
+
+
+WHISPER_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
+WHISPER_MODELS = ["whisper-large-v3-turbo", "whisper-large-v3"]
+
+
+def transcribe(audio: bytes, filename: str, mime: str, budget=40) -> str:
+    """Speech to text with Groq's Whisper, any language. The audio is not kept."""
+    errors = []
+    end = time.time() + budget
+    for model in WHISPER_MODELS:
+        for key in groq_keys.ordered():
+            if time.time() > end:
+                raise LLMError("; ".join(errors[-4:] + ["out of time"]))
+            try:
+                r = httpx.post(
+                    WHISPER_URL,
+                    headers={"Authorization": f"Bearer {key}"},
+                    data={"model": model, "temperature": "0", "response_format": "json"},
+                    files={"file": (filename, audio, mime)},
+                    timeout=TIMEOUT,
+                )
+                if r.status_code == 429:
+                    groq_keys.rest(key, 30)
+                    errors.append(f"{model}: rate limited")
+                    continue
+                if r.status_code in (401, 403):
+                    groq_keys.rest(key, 3600)
+                    errors.append(f"{model}: key rejected")
+                    continue
+                if r.status_code == 404:
+                    errors.append(f"{model}: model unavailable")
+                    break
+                if r.status_code == 400:
+                    raise LLMError("The recording could not be read.")
+                r.raise_for_status()
+                return (r.json().get("text") or "").strip()
+            except (httpx.HTTPError, KeyError, ValueError) as exc:
                 errors.append(f"{model}: {type(exc).__name__}")
     raise LLMError("; ".join(errors[-4:]) or "no Groq keys configured")

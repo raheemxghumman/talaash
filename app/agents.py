@@ -146,21 +146,32 @@ def verify(report: str, case: dict, zone: str = "not given") -> dict:
     return {"ok": not issues, "checker": checker, "issues": issues}
 
 
-def match(sighting: str, zone: str, cases: list[dict]) -> dict:
+MATCH_MODES = {
+    "sighting": ("SIGHTING (zone: {zone})", "OPEN CASES"),
+    "found": ("A CHILD FOUND ON THEIR OWN, now with a member of the public or staff (zone: {zone})", "OPEN MISSING-CHILD REPORTS"),
+    "missing": ("A PARENT'S REPORT OF A MISSING CHILD (last seen: {zone})", "CHILDREN FOUND ON THEIR OWN AND WAITING (case_id, zone where they are now)"),
+}
+
+
+def match(sighting: str, zone: str, cases: list[dict], mode: str = "sighting") -> dict:
+    """Score one description against open cases. mode "found" compares a found child with
+    missing reports; mode "missing" compares a parent's report with found children."""
     if not cases:
         return {"case_id": None, "score": 0.0, "reasons": ["No open cases."], "model": None}
     listing = [
         {
             "case_id": c["id"],
-            "age_years": c["extracted"].get("age_years"),
-            "gender": c["extracted"].get("gender"),
-            "clothing": c["extracted"].get("clothing"),
-            "features": c["extracted"].get("features"),
-            "last_seen_zone": c["zone"],
+            "age_years": (c["extracted"] or {}).get("age_years"),
+            "gender": (c["extracted"] or {}).get("gender"),
+            "clothing": (c["extracted"] or {}).get("clothing"),
+            "features": (c["extracted"] or {}).get("features"),
+            "name": (c["extracted"] or {}).get("child_name") if mode != "sighting" else None,
+            "zone": c["zone"],
         }
         for c in cases
     ]
-    user = f"SIGHTING (zone: {zone}):\n{sighting}\n\nOPEN CASES:\n{json.dumps(listing, indent=2)}"
+    head, list_head = MATCH_MODES[mode]
+    user = f"{head.format(zone=zone)}:\n{sighting}\n\n{list_head}:\n{json.dumps(listing, indent=2)}"
     try:
         data, model = groq_json(MATCH_SYSTEM, user)
     except LLMError as exc:
@@ -173,3 +184,87 @@ def match(sighting: str, zone: str, cases: list[dict]) -> dict:
         score = 0.0
     reasons = [str(r)[:120] for r in (data.get("reasons") or [])][:3]
     return {"case_id": case_id, "score": score if case_id else min(score, 0.3), "reasons": reasons, "model": model}
+
+
+# ---------- PA announcements ----------
+
+PA_SYSTEM = """You write public address announcements for venue security at a mall, airport or stadium.
+Write one calm, clear announcement in English, under 45 words, about a missing child.
+
+Use the age, boy/girl and clothing. You may say where the child was last seen.
+Never use the child's name: a stranger could use it to call the child over.
+Never include the parent's name or any phone number.
+End with: "If you see this child, please tell any member of staff or come to the security desk."
+
+Return JSON: {"text": "<announcement>"}"""
+
+FOUND_PA = ("Attention please. A young child has been found and is safe with our staff. "
+            "If you are missing a child, please come to the security desk now. Thank you.")
+
+
+def pa_template(case: dict) -> str:
+    if case.get("kind") == "found":
+        return FOUND_PA
+    x = case.get("extracted") or {}
+    who = " ".join(p for p in [f"{x['age_years']}-year-old" if x.get("age_years") is not None else "young",
+                               x.get("gender") or "child"] if p)
+    wearing = f", wearing {', '.join(x['clothing'][:3])}" if x.get("clothing") else ""
+    return (f"Attention please. We are looking for a {who}{wearing}, last seen near the {case['zone']}. "
+            "If you see this child, please tell any member of staff or come to the security desk.")
+
+
+def pa_problems(text: str, case: dict) -> list[str]:
+    """Code checks on any announcement, written by the AI or edited by the officer."""
+    problems = []
+    low = f" {text.lower()} "
+    x = case.get("extracted") or {}
+    for label, value in (("the child's name", x.get("child_name")), ("the parent's name", case.get("reporter_name"))):
+        for part in str(value or "").split():
+            if len(part) >= 3 and re.search(r"\b" + re.escape(part.lower()) + r"\b", low):
+                problems.append(f"It includes {label} ({part}).")
+                break
+    if re.search(r"\d[\d\s-]{5,}\d", text):
+        problems.append("It includes what looks like a phone number.")
+    if len(text.split()) > 60:
+        problems.append("It is too long to read out clearly.")
+    if len(text.strip()) < 20:
+        problems.append("It is too short.")
+    return problems
+
+
+def pa_draft(case: dict) -> dict:
+    """An AI draft when it passes the checks, otherwise the plain template."""
+    if case.get("kind") == "found":
+        return {"text": FOUND_PA, "source": "template", "note": "Found children are never described in public, so nobody can claim them by repeating the description."}
+    x = case.get("extracted") or {}
+    facts = {"age_years": x.get("age_years"), "gender": x.get("gender"), "clothing": x.get("clothing"),
+             "features": x.get("features"), "last_seen_zone": case["zone"]}
+    try:
+        data, model = groq_json(PA_SYSTEM, json.dumps(facts))
+        text = " ".join(str(data.get("text") or "").split())[:500]
+    except LLMError:
+        return {"text": pa_template(case), "source": "template", "note": "The AI was unavailable, so this is the standard wording."}
+    problems = pa_problems(text, case)
+    if problems:
+        return {"text": pa_template(case), "source": "template", "note": "The AI draft failed a safety check, so this is the standard wording."}
+    return {"text": text, "source": model, "note": None}
+
+
+# ---------- incident summary ----------
+
+SUMMARY_SYSTEM = """Rewrite the facts you are given as a short incident summary for a venue's security manager.
+3 or 4 plain sentences. Use only these facts. Do not add any time, number, person or event that is not listed.
+Return JSON: {"summary": "<text>"}"""
+
+
+def incident_summary(lines: list[str]) -> str | None:
+    """AI phrasing of facts worked out in code. Rejected if it adds a number that isn't in the facts."""
+    try:
+        data, _ = groq_json(SUMMARY_SYSTEM, "\n".join(f"- {line}" for line in lines))
+    except LLMError:
+        return None
+    text = " ".join(str(data.get("summary") or "").split())[:900]
+    allowed = set(re.findall(r"\d+", " ".join(lines)))
+    if not text or not set(re.findall(r"\d+", text)) <= allowed:
+        return None
+    return text

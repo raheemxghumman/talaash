@@ -1,13 +1,14 @@
 """Discord alerts. Every message is sent with ?wait=true so we keep its id,
 which lets the Closer edit it later and remove the child's details."""
 
+import json
 import time
 
 import httpx
 
-from app import config, db
+from app import config, db, photos
 
-COLORS = {"alert": 0xC0392B, "widen": 0xD35400, "police": 0x7B241C, "sighting": 0x1F6F8B, "resolved": 0x2E7D32}
+COLORS = {"found": 0x2F7D6B, "alert": 0xC0392B, "widen": 0xD35400, "police": 0x7B241C, "sighting": 0x1F6F8B, "resolved": 0x2E7D32}
 CHANNEL_LABEL = {"desk": "Zone security", "all_zones": "All zones", "police": "Police liaison"}
 
 
@@ -31,14 +32,18 @@ def describe(case: dict) -> list[dict]:
     return fields
 
 
-def _post(channel: str, payload: dict):
+def _post(channel: str, payload: dict, image: bytes | None = None):
     url = config.DISCORD_WEBHOOKS.get(channel)
     if not url:
         return None, "webhook not configured"
     error = "rate limited"
     for attempt in range(3):
         try:
-            r = httpx.post(url, params={"wait": "true"}, json=payload, timeout=10)
+            if image:
+                r = httpx.post(url, params={"wait": "true"}, data={"payload_json": json.dumps(payload)},
+                               files={"files[0]": ("child.jpg", image, "image/jpeg")}, timeout=20)
+            else:
+                r = httpx.post(url, params={"wait": "true"}, json=payload, timeout=10)
             if r.status_code == 429:
                 time.sleep(float(r.json().get("retry_after", 1)))
                 continue
@@ -61,7 +66,13 @@ def send(case: dict, channel: str, kind: str, title: str, note: str, fields=None
             "footer": {"text": f"Case #{case['id']} · Talaash · approved by the desk officer"},
         }],
     }
-    message_id, error = _post(channel, payload)
+    image = None
+    if case.get("photo_id") and case.get("kind", "missing") == "missing" and kind in ("alert", "widen", "police"):
+        row = photos.get(case["photo_id"])
+        if row:
+            image = bytes(row["data"])
+            payload["embeds"][0]["image"] = {"url": "attachment://child.jpg"}
+    message_id, error = _post(channel, payload, image)
     db.run(
         "insert into alerts (case_id, channel, message_id, kind, error) values (%s, %s, %s, %s, %s)",
         case["id"], channel, message_id, kind, error,
@@ -77,7 +88,7 @@ def withdraw_all(case: dict, note: str) -> int:
         url = config.DISCORD_WEBHOOKS.get(alert["channel"])
         if not url:
             continue
-        payload = {"embeds": [{
+        payload = {"attachments": [], "embeds": [{
             "title": f"RESOLVED · Case #{case['id']}",
             "description": f"{note}\nDetails removed. Stand down.",
             "color": COLORS["resolved"],

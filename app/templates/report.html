@@ -7,10 +7,13 @@
   <h1>Report a missing child</h1>
   <p class="lede">Write it the way you’d say it, in any language. An officer checks it before guards are alerted.</p>
   {% if error %}<p class="notice notice-bad">{{ error }}</p>{% endif %}
-  <form class="panel" method="post" action="/report" data-sending="sending">
-    <label class="field">
-      <span>Describe your child</span>
-      <textarea id="desc" name="description" required minlength="15" placeholder="e.g. My son Ali is 6, red t-shirt and blue shorts, curly hair. I lost him near the food court 5 minutes ago.">{{ description or "" }}</textarea>
+  <form class="panel" method="post" action="/report" data-sending="sending" enctype="multipart/form-data">
+    <div class="field">
+      <label for="desc">Describe your child</label>
+      <div class="voice-wrap">
+        <textarea id="desc" name="description" required minlength="15" placeholder="e.g. My son Ali is 6, red t-shirt and blue shorts, curly hair. I lost him near the food court 5 minutes ago.">{{ description or "" }}</textarea>
+        {% include "_voice.html" %}
+      </div>
       <div class="hints" aria-label="Add details">
         <button type="button" class="hint-chip" data-target="desc" data-hint="Name:">+ Name</button>
         <button type="button" class="hint-chip" data-target="desc" data-hint="Age:">+ Age</button>
@@ -18,7 +21,30 @@
         <button type="button" class="hint-chip" data-target="desc" data-hint="Hair:">+ Hair</button>
         <button type="button" class="hint-chip" data-target="desc" data-hint="Last seen:">+ When</button>
       </div>
-    </label>
+    </div>
+    <div class="field">
+      <span class="field-label">A recent photo <small>optional</small></span>
+      <div class="photo-pick" id="photo-pick">
+        <input type="file" name="photo" id="photo" accept="image/jpeg,image/png,image/webp">
+        <label for="photo" class="pp-empty">
+          <span class="pp-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span>
+          <span><b>Add a photo from your phone</b><small>Guards see it only after the officer approves. Used for clothing, never face matching. Deleted when the case closes.</small></span>
+        </label>
+        <div class="pp-full">
+          <img id="photo-prev" alt="Your photo">
+          <div class="pp-info"><b id="photo-name">Photo ready</b><small id="photo-size"></small>
+            <div class="today" role="radiogroup" aria-label="Was this photo taken today?">
+              <span>Taken today?</span>
+              <label><input type="radio" name="photo_today" value="yes"><i>Yes</i></label>
+              <label><input type="radio" name="photo_today" value="no"><i>No</i></label>
+              <label><input type="radio" name="photo_today" value="unsure" checked><i>Not sure</i></label>
+            </div>
+          </div>
+          <button type="button" class="pp-remove" aria-label="Remove photo">&times;</button>
+        </div>
+        <p class="pp-error" role="alert"></p>
+      </div>
+    </div>
     <fieldset class="field">
       <legend>Where did you last see them?</legend>
       <div class="zones">
@@ -26,11 +52,12 @@
       </div>
     </fieldset>
     <div class="two">
-      <label class="field"><span>Your name</span><input name="reporter_name" autocomplete="name"></label>
-      <label class="field"><span>Your phone</span><input name="reporter_phone" type="tel" autocomplete="tel" inputmode="tel"></label>
+      <label class="field"><span>Your name</span><input name="reporter_name" autocomplete="name" value="{{ reporter_name or '' }}"></label>
+      <label class="field"><span>Your phone</span><input name="reporter_phone" type="tel" autocomplete="tel" inputmode="tel" value="{{ reporter_phone or '' }}"></label>
     </div>
+    <label class="hp" aria-hidden="true">Website <input name="website" tabindex="-1" autocomplete="off"></label>
     <button class="btn btn-signal btn-block" type="submit">Send to security <span class="arrow">→</span></button>
-    <p class="fine">Stay where you are if you can. A staff member will come to you.</p>
+    <p class="fine">Stay where you are if you can. A staff member will come to you. <a href="/found">Found a child instead?</a></p>
   </form>
 </main>
 <div class="sending" id="sending" role="status" aria-live="polite">
@@ -46,4 +73,4 @@
 </div>
 {% endblock %}
 {% block footer %}{% endblock %}
-{% block scripts %}<script src="/static/site.js?v=3"></script>{% endblock %}
+{% block scripts %}<script src="/static/site.js?v=5"></script>{% endblock %}

@@ -6,6 +6,7 @@
   <p class="eyebrow" style="color:var(--sky)">For venue staff</p>
   <h1>Report a sighting</h1>
   <p class="lede">Say what you see, even if you’re not sure. The matcher scores it and the desk officer decides.</p>
+  <a class="switch-card" href="/found"><span class="sw-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.4-7-11a7 7 0 0 1 14 0c0 6.6-7 11-7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg></span><span><b>Is the child with you right now?</b> Report a found child instead, so the desk sends staff to you.</span><span class="arrow">→</span></a>
   {% if error %}<p class="notice notice-bad">{{ error }}</p>{% endif %}
   <form class="panel" method="post" action="/sighting" data-sending="sending">
     <label class="field">
@@ -31,4 +32,4 @@
 </div>
 {% endblock %}
 {% block footer %}{% endblock %}
-{% block scripts %}<script src="/static/site.js?v=3"></script>{% endblock %}
+{% block scripts %}<script src="/static/site.js?v=5"></script>{% endblock %}

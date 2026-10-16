@@ -19,10 +19,11 @@ from app.llm import LLMError, groq_chat
 MEMORY_SECONDS = 10 * 60
 MEMORY_MESSAGES = 8
 
-HELP = """You can ask me:
+HELP = """Here's what I can do:
 - "What are we looking for?" or "Any kids missing near Gate 2?" - open searches, nearest first
 - "Tell me about case 3" - description, search stage and latest updates
 - "I can see a small girl in a pink dress crying by the cinema" - I file it as a sighting for the desk
+- "I've got a lost boy with me at Gate 2" - I tell the desk you're holding a found child
 - "Did the desk check my sighting?" - what happened to the sightings you filed
 - "Which zones are there?"
 I can't approve alerts, confirm sightings or close cases. The desk officer does that."""
@@ -37,11 +38,15 @@ You are talking to the guard "{guard}". Guards message you about lost children. 
   Zones: {", ".join(tools.list_zones())}. Map what they say to one of these (e.g. "near gate 3" is "Gate 3").
   If you can't tell the zone, ask for it instead of guessing. Once they answer, file the sighting using the
   description from their earlier message.
+- If the guard says a lost child is WITH them now (they are holding or standing with the child), call
+  report_found_child instead of report_sighting, with the description and zone. Tell them to stay with the child and
+  that the desk officer has it and will send staff. Never say staff are already on the way.
 - If they ask what to look for, call list_open_cases (pass their zone if they mention one).
 - If they ask about one case, call get_case.
 - If they ask what happened to their sighting, call my_sightings.
 - If they ask which zones exist, call list_zones.
-- If they ask what you can do, or say help, reply with exactly this text:
+- Only if they literally say "help", or ask what you (the assistant) can do, reply with exactly this text.
+  A question about children or cases, like "what are we looking for?", is NOT a help request: call list_open_cases.
 {HELP}
 - You cannot approve alerts, confirm sightings or close cases. The desk officer does that. Say so if asked.
 - Never share a parent's name or phone number.
@@ -65,6 +70,14 @@ def tool_specs() -> list[dict]:
             "description": "File what the guard can see. The desk officer decides if it is the child.",
             "parameters": {"type": "object", "properties": {
                 "description": {"type": "string", "description": "What the guard saw about the child, in their own words"},
+                "zone": {"type": "string", "enum": tools.list_zones()},
+            }, "required": ["description", "zone"]},
+        }},
+        {"type": "function", "function": {
+            "name": "report_found_child",
+            "description": "The guard has a lost child with them right now. The desk officer sends staff and looks for the parent.",
+            "parameters": {"type": "object", "properties": {
+                "description": {"type": "string", "description": "What the child looks like and anything they said, in the guard's words"},
                 "zone": {"type": "string", "enum": tools.list_zones()},
             }, "required": ["description", "zone"]},
         }},
@@ -149,6 +162,12 @@ def run_tool(name: str, raw_args: str, guard: str, said: list[str] | None = None
         result = tools.report_sighting(text, args.get("zone", ""), reporter)
         if "error" not in result:
             db.log(result.get("case_id"), "Guard assistant", f"Filed sighting #{result['sighting_id']} from Discord for {guard}")
+        return result
+    if name == "report_found_child":
+        text = sighting_text(args.get("description", ""), guard, said or [])
+        result = tools.report_found_child(text, args.get("zone", ""), reporter)
+        if "error" not in result:
+            db.log(result["case_id"], "Guard assistant", f"Filed a found-child report from Discord for {guard}")
         return result
     if name == "my_sightings":
         return tools.sighting_status(reporter) or {"note": "You haven't filed any sightings yet."}

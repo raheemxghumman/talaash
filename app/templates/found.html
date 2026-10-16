@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Found a child · Talaash{% endblock %}
+{% block bodyclass %}theme-found{% endblock %}
+{% block nav %}<a class="nav-cta" href="/">Back</a>{% endblock %}
+{% block content %}
+<main class="page">
+  <p class="eyebrow eyebrow-sage">Found a child on their own?</p>
+  <h1>Tell security you’re with a lost child</h1>
+  <p class="lede">Thank you for stopping. The desk officer will send staff to you and look for the parent.</p>
+  <div class="stay-card">
+    <span class="stay-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.4-7-11a7 7 0 0 1 14 0c0 6.6-7 11-7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+    <div><b>Stay where you are with the child.</b> Please don’t walk off with them, even to look for the parent. Staff will come to you.</div>
+  </div>
+  {% if error %}<p class="notice notice-bad">{{ error }}</p>{% endif %}
+  <form class="panel" method="post" action="/found" data-sending="sending">
+    <div class="field">
+      <label for="desc">Describe the child</label>
+      <div class="voice-wrap">
+        <textarea id="desc" name="description" required minlength="10" placeholder="e.g. Little girl about 4, yellow dress, crying, says her name is Sara and her mama was buying shoes.">{{ description or "" }}</textarea>
+        {% include "_voice.html" %}
+      </div>
+      <div class="hints" aria-label="Add details">
+        <button type="button" class="hint-chip" data-target="desc" data-hint="Age about:">+ Age</button>
+        <button type="button" class="hint-chip" data-target="desc" data-hint="Wearing:">+ Clothes</button>
+        <button type="button" class="hint-chip" data-target="desc" data-hint="Says their name is:">+ Name they say</button>
+        <button type="button" class="hint-chip" data-target="desc" data-hint="They said:">+ What they said</button>
+      </div>
+    </div>
+    <fieldset class="field">
+      <legend>Where are you now?</legend>
+      <div class="zones">
+        {% for z in zones %}<label><input type="radio" name="zone" value="{{ z }}" required {% if z == zone %}checked{% endif %}><span>{{ z }}</span></label>{% endfor %}
+      </div>
+    </fieldset>
+    <div class="two">
+      <label class="field"><span>Your name</span><input name="reporter_name" autocomplete="name" value="{{ reporter_name or '' }}" required></label>
+      <label class="field"><span>Your phone</span><input name="reporter_phone" type="tel" autocomplete="tel" inputmode="tel" value="{{ reporter_phone or '' }}" required minlength="7"></label>
+    </div>
+    <label class="hp" aria-hidden="true">Website <input name="website" tabindex="-1" autocomplete="off"></label>
+    <button class="btn btn-sage btn-block" type="submit">Tell security <span class="arrow">→</span></button>
+    <p class="fine">Staff use your phone number only to find you. Nothing about the child is announced in public.</p>
+  </form>
+</main>
+<div class="sending sending-sage" id="sending" role="status" aria-live="polite">
+  <div class="sending-box">
+    <div class="pulse"><i></i><i></i><i></i><b></b></div>
+    <h2>Telling the security desk</h2>
+    <ol>
+      <li>Reading what you wrote</li>
+      <li>Checking it against missing-child reports</li>
+      <li>Handing it to the officer on duty</li>
+    </ol>
+  </div>
+</div>
+{% endblock %}
+{% block footer %}{% endblock %}
+{% block scripts %}<script src="/static/site.js?v=5"></script>{% endblock %}

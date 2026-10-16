@@ -7,7 +7,15 @@
   <h1 id="headline">The security desk has your report.</h1>
   <p class="lede" id="subline">Keep this page open. It updates by itself.</p>
   <div class="panel">
-    <ol class="progress" id="progress">
+    {% if status.kind == "found" %}
+    <ol class="progress progress-sage" id="progress">
+      <li data-step="sent"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><div><b>Message received</b><span>The AI has read it and compared it with missing-child reports.</span></div></li>
+      <li data-step="checking"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><div><b>Officer checking</b><span>A person reads it and decides who to send.</span></div></li>
+      <li data-step="dispatched"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><div><b>Staff on the way to {{ status.zone }}</b><span>Stay where you are with the child.</span></div></li>
+      <li data-step="reunited"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><div><b>Child handed over</b><span>The child is with security staff or their family.</span></div></li>
+    </ol>
+    <div class="advice" id="advice"><b>While you wait</b>Stay where you are with the child and keep your phone on. Don’t hand the child to anyone except venue staff.</div>
+    {% else %}    <ol class="progress" id="progress">
       <li data-step="sent"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><div><b>Report received</b><span>The AI has read it and checked the details.</span></div></li>
       <li data-step="checking"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><div><b>Officer checking</b><span>A person confirms the details before anyone is alerted.</span></div></li>
       <li data-step="zone"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><div><b>Guards searching {{ status.zone }}</b><span>Security near where you last saw them has the description.</span></div></li>
@@ -16,15 +24,17 @@
       <li data-step="found"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><div><b>Found</b><span>Your child is safe with staff.</span></div></li>
     </ol>
     <div class="advice" id="advice"><b>While you wait</b>Stay where you are if you can, so staff can find you. Keep your phone with you; the desk may call to check a detail.</div>
+    {% endif %}
   </div>
-  <p class="fine"><a href="/report">Report another child</a></p>
+  <p class="fine">{% if status.kind == "found" %}<a href="/found">Report another child</a>{% else %}<a href="/report">Report another child</a>{% endif %}</p>
 </main>
 {% endblock %}
 {% block footer %}{% endblock %}
 {% block scripts %}
 <script>
 (() => {
-  const order = ["sent", "checking", "zone", "all_zones", "police", "found"];
+  const found = {{ (status.kind == "found")|tojson }};
+  const order = found ? ["sent", "checking", "dispatched", "reunited"] : ["sent", "checking", "zone", "all_zones", "police", "found"];
   const copy = {
     checking: ["The security desk has your report.", "An officer is checking it now. Guards are alerted as soon as they approve."],
     zone: ["Guards are searching.", "Security near {{ status.zone }} has your child’s description."],
@@ -33,20 +43,24 @@
     police: ["The police have been informed.", "The venue search continues alongside them."],
     found: ["Your child has been found.", "Go to the security desk, or wait where you are and staff will bring you together."],
     rejected: ["Please go to the security desk.", "The officer needs to speak with you in person about this report."],
+    dispatched: ["Staff are on their way.", "Stay at {{ status.zone }} with the child. A member of staff will come to you."],
+    reunited: ["Thank you. The child is safe.", "Staff have taken over. You helped a family today."],
   };
+  if (found) copy.checking = ["The security desk has your message.", "An officer is reading it now and will send staff to you."];
   const items = [...document.querySelectorAll("#progress li")];
   function show(s) {
     const step = s.step === "sighted" ? "zone" : s.step;
     const idx = step === "rejected" ? 1 : order.indexOf(step);
     items.forEach((li, i) => {
       li.className = "";
-      if (step === "found") li.classList.add(i === order.length - 1 ? "found" : "done");
+      if (step === "found" || step === "reunited") li.classList.add(i === order.length - 1 ? "found" : "done");
       else if (i < idx) li.classList.add("done");
       else if (i === idx) li.classList.add("now");
     });
     const [h, sub] = copy[s.step] || copy.checking;
     document.getElementById("headline").textContent = h;
     document.getElementById("subline").textContent = sub;
+    if (s.step === "reunited") document.getElementById("advice").innerHTML = "<b>Done</b>Thank you for staying with the child until staff arrived.";
     if (s.step === "found") document.getElementById("advice").innerHTML = "<b>Found</b>Thank you for acting fast. All alerts about your child have been withdrawn.";
   }
   show({{ status|tojson }});

@@ -64,6 +64,35 @@ create table if not exists events (
     detail text,
     at timestamptz not null default now()
 );
+
+-- 'missing' is a parent's report; 'found' is a child someone is holding
+alter table cases add column if not exists kind text not null default 'missing';
+alter table cases add column if not exists photo_id int;
+alter table cases add column if not exists photo_today text;
+alter table cases add column if not exists report jsonb;
+alter table cases add column if not exists ip_key text;
+
+create table if not exists photos (
+    id serial primary key,
+    data bytea not null,
+    mime text not null,
+    phash text,
+    analysis jsonb,
+    created_at timestamptz not null default now()
+);
+
+create table if not exists matches (
+    id serial primary key,
+    missing_id int not null references cases(id),
+    found_id int not null references cases(id),
+    score real,
+    reasons jsonb,
+    decision text,
+    decided_by text,
+    created_at timestamptz not null default now(),
+    decided_at timestamptz,
+    unique (missing_id, found_id)
+);
 """
 
 

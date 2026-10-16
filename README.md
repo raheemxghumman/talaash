@@ -24,6 +24,10 @@ Built in about a day for Agentika 2.0 at NaSCon'26. Theme: *Human + AI: Better T
 
 The desk has a 3D venue map with open cases, sightings and the search area. From the bigger view the officer can add, move, resize, rename or remove zones; the forms, the guard assistant and the MCP server use the new zone list straight away.
 
+**Found a child?** Anyone who finds a child alone can tell the desk at `/found`. The matcher compares found children and parents' reports in both directions; the officer reunites them only after an identity check, and found children are never described in public, so nobody can claim one by repeating a description.
+
+**Also at the desk:** an optional parent photo (location data stripped, read for clothing only, never faces, shown to guards only after approval, deleted on close), AI-drafted PA announcements the officer approves (never with the child's name), private notes, an incident report written from the log on close, and stats. Parents can speak instead of typing (Groq Whisper); they check the text before sending.
+
 Parents get a private live status page that updates as the search moves on, with progress only and no details.
 
 ## Reliability
@@ -31,6 +35,7 @@ Parents get a private live status page that updates as the search moves on, with
 - Five Groq and five Gemini keys rotate; rate-limited keys rest and the next one is used.
 - Each model call has a time budget. If the models are down, the case is still created and handed to the officer for manual entry.
 - Discord sends retry and are logged. Every agent decision and human action goes into an audit log.
+- Public forms are rate limited per network (warning first, then a block) and carry a hidden bot trap. IP addresses are never stored, only a keyed hash.
 - `pytest` runs in CI before every image build (`tests/`).
 
 ## Stack

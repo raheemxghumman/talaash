@@ -13,7 +13,7 @@ from app import config, tools
 mcp = FastMCP(
     "Talaash",
     instructions=(
-        "Lost-child desk for a crowded venue. You can list active searches, read a case, and file a sighting. "
+        "Lost-child desk for a crowded venue. You can list active searches, read a case, file a sighting, and report a found child. "
         "You cannot approve alerts, confirm sightings or close cases: a human desk officer does that."
     ),
     stateless_http=True,
@@ -45,6 +45,12 @@ def get_case(case_id: int) -> dict:
 def report_sighting(description: str, zone: str, reporter: str = "") -> dict:
     """File what a staff member can see. The matcher scores it and the desk officer decides. Zone must be one of list_zones()."""
     return tools.report_sighting(description, zone, reporter)
+
+
+@mcp.tool()
+def report_found_child(description: str, zone: str, reporter: str = "") -> dict:
+    """A lost child is with the reporter right now. Files it for the desk officer, who sends staff. Zone must be one of list_zones()."""
+    return tools.report_found_child(description, zone, reporter)
 
 
 class BearerAuth:

@@ -8,3 +8,4 @@ python-multipart==0.0.20
 psycopg-pool==3.2.4
 discord.py==2.7.1
 mcp==1.30.0
+pillow==11.1.0

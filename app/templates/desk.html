@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/desk.css?v=4">
+<link rel="stylesheet" href="/static/desk.css?v=5">
 <script type="importmap">
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
@@ -27,6 +27,7 @@
     <button class="stat s-sage" data-filter="closed"><b id="st-found">0</b><span>Found today</span></button>
   </div>
   <div class="bar-right">
+    <button class="stats-btn" id="stats-open" title="Numbers for today and this week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Stats</span></button>
     <span class="live" title="Connected"><i id="live-dot"></i><span id="clock">--:--:--</span></span>
     <span class="officer"><span class="avatar">{{ officer[:1]|upper }}</span>{{ officer }}</span>
     <a class="logout" href="/logout">Log out</a>
@@ -96,9 +97,16 @@
     </aside>
   </div>
 </dialog>
+<dialog id="stats-dlg" class="stats-dlg" aria-label="Desk numbers">
+  <div class="sd-head"><div><h3>How the desk is doing</h3><p>Every number comes from the audit log.</p></div>
+    <div class="seg" role="group" aria-label="Period"><button data-period="day" class="on">Today</button><button data-period="week">7 days</button></div>
+    <form method="dialog"><button class="icon-btn" aria-label="Close">&times;</button></form></div>
+  <div id="stats-body" class="sd-body"></div>
+</dialog>
+<dialog id="lightbox" class="lightbox" aria-label="Photo"><img alt="Photo from the parent"><button class="icon-btn lb-close" data-close aria-label="Close">&times;</button><p>Desk only. Deleted when the case closes.</p></dialog>
 <div class="toast" id="toast" hidden></div>
 <dialog id="ask"><form method="dialog"><h3 id="ask-title"></h3><p id="ask-text"></p><textarea id="ask-input" rows="3"></textarea><div class="dlg-actions"><button value="cancel" class="btn ghost">Cancel</button><button value="ok" class="btn" id="ask-ok">Confirm</button></div></form></dialog>
-<script src="/static/desk.js?v=4"></script>
-<script type="module" src="/static/venuemap.js?v=1"></script>
+<script src="/static/desk.js?v=5"></script>
+<script type="module" src="/static/venuemap.js?v=2"></script>
 </body>
 </html>
