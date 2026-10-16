@@ -10,16 +10,19 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app import agents, config, db, desk
+from app import agents, config, db, desk, guard_bot, mcp_server
 
 BASE = Path(__file__).parent
+mcp_app = mcp_server.asgi_app()
 
 
 @asynccontextmanager
 async def lifespan(_app):
     db.init()
     desk.start_watcher()
-    yield
+    guard_bot.start()
+    async with mcp_server.mcp.session_manager.run():
+        yield
 
 
 app = FastAPI(title="Talaash", lifespan=lifespan)
@@ -207,3 +210,7 @@ def healthz():
         checks["database"] = f"error: {type(exc).__name__}"
     healthy = checks["database"] == "ok"
     return JSONResponse({"ok": healthy, **checks}, status_code=200 if healthy else 503)
+
+
+# MCP lives at /mcp. Mounted last so every route above takes precedence.
+app.mount("/", mcp_app)

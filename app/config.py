@@ -22,3 +22,9 @@ DISCORD_WEBHOOKS = {
 
 DESK_USER = os.getenv("DESK_USER", "desk")
 DESK_PASSWORD = os.getenv("DESK_PASSWORD", "")
+
+MCP_TOKEN = os.getenv("MCP_TOKEN", "")
+DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN", "").strip()
+DISCORD_AGENT_CHANNEL_ID = int(os.getenv("DISCORD_AGENT_CHANNEL_ID", "0").strip() or 0)
+# Only the deployed service runs the bot, so a laptop copy doesn't answer twice.
+DISCORD_BOT_ENABLED = os.getenv("DISCORD_BOT_ENABLED", "") == "1"

@@ -139,3 +139,36 @@ def gemini_json(prompt: str, budget=40):
             except (httpx.HTTPError, json.JSONDecodeError, KeyError, IndexError) as exc:
                 errors.append(f"{model}: {type(exc).__name__}")
     raise LLMError("; ".join(errors[-4:]) or "no Gemini keys configured")
+
+
+def groq_chat(messages: list, tools: list, budget=40):
+    """One chat turn with tool definitions. Returns the assistant message dict."""
+    errors = []
+    end = time.time() + budget
+    for model in GROQ_MAIN:
+        for key in groq_keys.ordered():
+            if time.time() > end:
+                raise LLMError("; ".join(errors[-4:] + ["out of time"]))
+            try:
+                r = httpx.post(
+                    GROQ_URL,
+                    headers={"Authorization": f"Bearer {key}"},
+                    json={"model": model, "temperature": 0.2, "messages": messages, "tools": tools, "tool_choice": "auto"},
+                    timeout=TIMEOUT,
+                )
+                if r.status_code == 429:
+                    groq_keys.rest(key, 30)
+                    errors.append(f"{model}: rate limited")
+                    continue
+                if r.status_code in (401, 403):
+                    groq_keys.rest(key, 3600)
+                    errors.append(f"{model}: key rejected")
+                    continue
+                if r.status_code == 404:
+                    errors.append(f"{model}: model unavailable")
+                    break
+                r.raise_for_status()
+                return r.json()["choices"][0]["message"]
+            except (httpx.HTTPError, KeyError) as exc:
+                errors.append(f"{model}: {type(exc).__name__}")
+    raise LLMError("; ".join(errors[-4:]) or "no Groq keys configured")
