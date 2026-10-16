@@ -148,6 +148,18 @@ def verify(report: str, case: dict, zone: str = "not given") -> dict:
     return {"ok": not issues, "checker": checker, "issues": issues}
 
 
+def clean_reasons(raw) -> list[str]:
+    """Models sometimes pack several reasons into one quoted string; split them back out."""
+    items = raw if isinstance(raw, list) else [raw] if raw else []
+    out = []
+    for item in items:
+        for part in re.split(r'"\s*,\s*"|;\s*|\n', str(item)):
+            part = part.strip().strip('[]"\' ').strip()
+            if part:
+                out.append(part[:1].upper() + part[1:120])
+    return out[:3]
+
+
 MATCH_MODES = {
     "sighting": ("SIGHTING (zone: {zone})", "OPEN CASES"),
     "found": ("A CHILD FOUND ON THEIR OWN, now with a member of the public or staff (zone: {zone})", "OPEN MISSING-CHILD REPORTS"),
@@ -184,7 +196,7 @@ def match(sighting: str, zone: str, cases: list[dict], mode: str = "sighting") -
         score = max(0.0, min(1.0, float(data.get("score") or 0)))
     except (TypeError, ValueError):
         score = 0.0
-    reasons = [str(r)[:120] for r in (data.get("reasons") or [])][:3]
+    reasons = clean_reasons(data.get("reasons"))
     return {"case_id": case_id, "score": score if case_id else min(score, 0.3), "reasons": reasons, "model": model}
 
 

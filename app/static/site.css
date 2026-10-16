@@ -1,5 +1,6 @@
 /* Talaash: shared styles for public pages */
 :root {
+  color-scheme: light;
   --ink: #13202f;
   --ink-2: #24364a;
   --ink-3: #3a4d62;

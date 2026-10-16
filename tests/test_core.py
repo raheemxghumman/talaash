@@ -58,6 +58,12 @@ def test_verifier_falls_back_and_says_so(monkeypatch):
     assert any("unavailable" in i["problem"] for i in check["issues"])
 
 
+def test_matcher_reasons_are_split_into_clean_bullets():
+    assert agents.clean_reasons(['clothing matches","age and name match","no contradictory details']) == [
+        "Clothing matches", "Age and name match", "No contradictory details"]
+    assert agents.clean_reasons(None) == []
+
+
 def test_parse_json_handles_code_fences():
     assert llm.parse_json('```json\n{"a": 1}\n```') == {"a": 1}
     assert llm.parse_json('Sure: {"a": 2} done') == {"a": 2}

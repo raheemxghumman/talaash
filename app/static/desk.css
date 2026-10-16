@@ -1,4 +1,5 @@
 :root {
+  color-scheme: light;
   --ink: #13202f; --ink-2: #24364a; --ink-3: #3a4d62;
   --paper: #f1ede4; --paper-2: #e9e3d6; --card: #fffdf8;
   --line: #e0d8c8; --line-2: #cfc6b3; --muted: #6a6f77;
