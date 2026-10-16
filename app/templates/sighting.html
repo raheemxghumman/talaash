@@ -1,23 +1,34 @@
 {% extends "base.html" %}
 {% block title %}Report a sighting · Talaash{% endblock %}
+{% block nav %}<a class="nav-cta" href="/">Back</a>{% endblock %}
 {% block content %}
-<main class="narrow">
+<main class="page">
+  <p class="eyebrow" style="color:var(--sky)">For venue staff</p>
   <h1>Report a sighting</h1>
-  <p class="lede small">For venue staff. Say what you see, even if you’re not sure. The desk decides.</p>
+  <p class="lede">Say what you see, even if you’re not sure. The matcher scores it and the desk officer decides.</p>
   {% if error %}<p class="notice notice-bad">{{ error }}</p>{% endif %}
-  <form method="post" action="/sighting" class="form" data-busy="Checking open cases…">
-    <label>What do you see?
-      <textarea name="text" rows="4" required minlength="5" placeholder="e.g. small boy in a red shirt crying alone near the escalator">{{ text or "" }}</textarea>
+  <form class="panel" method="post" action="/sighting" data-sending="sending">
+    <label class="field">
+      <span>What do you see?</span>
+      <textarea id="seen" name="text" required minlength="5" style="min-height:110px" placeholder="e.g. small boy in a red shirt crying alone near the escalator">{{ text or "" }}</textarea>
     </label>
-    <label>Your zone
-      <select name="zone" required>
-        <option value="" disabled {% if not zone %}selected{% endif %}>Choose your zone</option>
-        {% for z in zones %}<option {% if z == zone %}selected{% endif %}>{{ z }}</option>{% endfor %}
-      </select>
-    </label>
-    <label>Your name or radio call sign <input name="reporter"></label>
-    <button class="btn btn-dark btn-wide" type="submit">Send sighting</button>
+    <fieldset class="field">
+      <legend>Your zone</legend>
+      <div class="zones">
+        {% for z in zones %}<label><input type="radio" name="zone" value="{{ z }}" required {% if z == zone %}checked{% endif %}><span>{{ z }}</span></label>{% endfor %}
+      </div>
+    </fieldset>
+    <label class="field"><span>Your name or radio call sign</span><input name="reporter" placeholder="e.g. Guard 7"></label>
+    <button class="btn btn-block" type="submit">Send sighting <span class="arrow">→</span></button>
   </form>
 </main>
-<script src="/static/forms.js"></script>
+<div class="sending" id="sending" role="status" aria-live="polite">
+  <div class="sending-box">
+    <div class="pulse"><i style="border-color:var(--sky)"></i><i style="border-color:var(--sky)"></i><i style="border-color:var(--sky)"></i><b style="background:var(--sky)"></b></div>
+    <h2>Checking open cases</h2>
+    <ol><li>Comparing with every active search</li><li>Scoring the match</li></ol>
+  </div>
+</div>
 {% endblock %}
+{% block footer %}{% endblock %}
+{% block scripts %}<script src="/static/site.js?v=3"></script>{% endblock %}

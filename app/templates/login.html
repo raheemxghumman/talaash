@@ -1,15 +1,37 @@
 {% extends "base.html" %}
 {% block title %}Desk login · Talaash{% endblock %}
+{% block nav %}<a href="/">Home</a>{% endblock %}
 {% block content %}
-<main class="narrow">
-  <h1>Security desk</h1>
-  <p class="lede small">For the officer on duty.</p>
-  {% if error %}<p class="notice notice-bad">Wrong username or password.</p>{% endif %}
-  <form method="post" action="/login" class="form">
-    <label>Your name (shown in the log) <input name="name" required placeholder="e.g. Officer Sara"></label>
-    <label>Username <input name="username" required autocomplete="username"></label>
-    <label>Password <input name="password" type="password" required autocomplete="current-password"></label>
-    <button class="btn btn-dark btn-wide" type="submit">Open the desk</button>
-  </form>
+<main class="login-wrap">
+  <section class="login-art">
+    <svg class="radar" viewBox="0 0 400 400" aria-hidden="true">
+      <circle cx="200" cy="200" r="60"/><circle cx="200" cy="200" r="120"/><circle cx="200" cy="200" r="180"/>
+      <path d="M200 20v360M20 200h360" stroke="#24364a"/>
+      <g class="sweep"><path d="M200 200 L200 20 A180 180 0 0 1 327 73 Z" fill="url(#sw)"/></g>
+      <defs><linearGradient id="sw" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e2552d" stop-opacity=".35"/><stop offset="1" stop-color="#e2552d" stop-opacity="0"/></linearGradient></defs>
+      <circle class="blip" cx="268" cy="118" r="6"/><circle class="blip b2" cx="120" cy="250" r="5"/><circle class="blip b3" cx="280" cy="290" r="5"/>
+    </svg>
+    <h2>Nothing goes out <em>until you approve it.</em></h2>
+    <ul>
+      <li>New reports, already structured and checked</li>
+      <li>Sightings scored, unsure ones flagged for you</li>
+      <li>A clock that escalates on its own</li>
+    </ul>
+  </section>
+  <section class="login-form">
+    <div class="login-card">
+      <h1>Security desk</h1>
+      <p class="lede">For the officer on duty.</p>
+      {% if error %}<p class="notice notice-bad">Wrong username or password.</p>{% endif %}
+      <form method="post" action="/login">
+        <label class="field"><span>Your name</span><input name="name" required placeholder="e.g. Officer Sara" autocomplete="nickname"><small>Shown next to your decisions in the log.</small></label>
+        <label class="field"><span>Username</span><input name="username" required autocomplete="username"></label>
+        <label class="field"><span>Password</span><input name="password" type="password" required autocomplete="current-password"></label>
+        <button class="btn btn-block" type="submit">Open the desk <span class="arrow">→</span></button>
+      </form>
+      <p class="demo-note">Judges: the demo login is in our submission.</p>
+    </div>
+  </section>
 </main>
 {% endblock %}
+{% block footer %}{% endblock %}

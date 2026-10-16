@@ -9,6 +9,7 @@ from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.routing import Route
 
 from app import agents, config, db, desk, guard_bot, mcp_server
 
@@ -54,6 +55,8 @@ def require_officer(request: Request) -> str:
 
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request, error: str = ""):
+    if officer(request):
+        return RedirectResponse("/desk", status_code=303)
     return templates.TemplateResponse(request, "login.html", {"error": error})
 
 
@@ -97,8 +100,24 @@ def report_submit(request: Request, description: str = Form(...), zone: str = Fo
             "zones": agents.ZONES, "error": "Please describe your child in a sentence or two and pick where you last saw them.",
             "description": description, "zone": zone,
         }, status_code=422)
-    case_id = desk.new_case(description, zone, reporter_name.strip()[:80], reporter_phone.strip()[:30])
-    return templates.TemplateResponse(request, "report_done.html", {"case_id": case_id, "zone": zone})
+    case_id, token = desk.new_case(description, zone, reporter_name.strip()[:80], reporter_phone.strip()[:30])
+    return RedirectResponse(f"/status/{token}", status_code=303)
+
+
+@app.get("/status/{token}", response_class=HTMLResponse)
+def status_page(request: Request, token: str):
+    status = desk.public_status(token)
+    if not status:
+        raise HTTPException(404)
+    return templates.TemplateResponse(request, "status.html", {"status": status, "token": token})
+
+
+@app.get("/api/status/{token}")
+def status_api(token: str):
+    status = desk.public_status(token)
+    if not status:
+        raise HTTPException(404, "Unknown report")
+    return status
 
 
 @app.get("/sighting", response_class=HTMLResponse)
@@ -124,7 +143,7 @@ def desk_page(request: Request):
     name = officer(request)
     if not name:
         return RedirectResponse("/login", status_code=303)
-    return templates.TemplateResponse(request, "desk.html", {"officer": name, "steps": desk.STEPS})
+    return templates.TemplateResponse(request, "desk.html", {"officer": name, "steps": desk.STEPS, "zones": agents.ZONES})
 
 
 def _iso(value):
@@ -134,20 +153,21 @@ def _iso(value):
 @app.get("/api/desk")
 def desk_state(request: Request):
     require_officer(request)
-    cases = db.all("""
-        select c.*, (select count(*) from alerts a where a.case_id = c.id and a.message_id is not null) as alerts_sent
-        from cases c
-        where c.status in ('review', 'active') or c.closed_at > now() - interval '30 minutes'
-        order by case c.status when 'review' then 0 when 'active' then 1 else 2 end, c.id desc
-        limit 30""")
-    sightings = db.all("""
-        select * from sightings where decision is null and route in ('likely', 'review')
-        order by case route when 'likely' then 0 else 1 end, id desc limit 20""")
-    events = db.all("select * from events order by id desc limit 40")
+    with db.conn() as c:
+        cases = c.execute("""
+            select c.*, (select count(*) from alerts a where a.case_id = c.id and a.message_id is not null) as alerts_sent
+            from cases c
+            where c.status in ('review', 'active') or c.closed_at > now() - interval '12 hours'
+            order by c.id desc limit 40""").fetchall()
+        sightings = c.execute("""
+            select * from sightings where created_at > now() - interval '12 hours'
+            order by id desc limit 80""").fetchall()
+        events = c.execute("select * from events order by id desc limit 120").fetchall()
     clean = lambda rows: [{k: _iso(v) for k, v in r.items()} for r in rows]
     return {
         "now": datetime.now(timezone.utc).isoformat(),
         "steps": desk.STEPS,
+        "zones": agents.ZONES,
         "cases": clean(cases),
         "sightings": clean(sightings),
         "events": clean(events),
@@ -193,6 +213,13 @@ def decide(sighting_id: int, decision: str, request: Request):
     return {"ok": True}
 
 
+@app.exception_handler(404)
+async def not_found(request: Request, exc):
+    if request.url.path.startswith("/api/"):
+        return JSONResponse({"detail": getattr(exc, "detail", "Not found")}, status_code=404)
+    return templates.TemplateResponse(request, "404.html", {}, status_code=404)
+
+
 # ---------- health ----------
 
 @app.get("/healthz")
@@ -212,5 +239,5 @@ def healthz():
     return JSONResponse({"ok": healthy, **checks}, status_code=200 if healthy else 503)
 
 
-# MCP lives at /mcp. Mounted last so every route above takes precedence.
-app.mount("/", mcp_app)
+# MCP lives at exactly /mcp (all methods), so other unknown paths still get our 404 page.
+app.router.routes.append(Route("/mcp", endpoint=mcp_app))

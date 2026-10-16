@@ -54,6 +54,8 @@ create table if not exists alerts (
     error text
 );
 
+alter table cases add column if not exists public_token text;
+
 create table if not exists events (
     id serial primary key,
     case_id int references cases(id),

@@ -1,6 +1,7 @@
 """The workflow: agents propose, the desk officer decides."""
 
 import os
+import secrets
 import threading
 import time
 from datetime import datetime, timezone
@@ -12,10 +13,11 @@ UNSURE = 0.45
 STEPS = [float(m) for m in os.getenv("ESCALATION_MINUTES", "1,2").split(",")]
 
 
-def new_case(report: str, zone: str, reporter_name: str, reporter_phone: str) -> int:
+def new_case(report: str, zone: str, reporter_name: str, reporter_phone: str) -> tuple[int, str]:
+    token = secrets.token_urlsafe(12)
     row = db.run(
-        "insert into cases (raw_report, zone, reporter_name, reporter_phone) values (%s, %s, %s, %s) returning id",
-        report, zone, reporter_name or None, reporter_phone or None,
+        "insert into cases (raw_report, zone, reporter_name, reporter_phone, public_token) values (%s, %s, %s, %s, %s) returning id",
+        report, zone, reporter_name or None, reporter_phone or None, token,
     )
     case_id = row["id"]
     db.log(case_id, "Parent", "Reported a missing child", f"Last seen: {zone}")
@@ -41,7 +43,29 @@ def new_case(report: str, zone: str, reporter_name: str, reporter_phone: str) ->
         db.as_json(case), db.as_json(check), "high" if urgent else "normal", result["ok"], case_id,
     )
     db.log(case_id, "Desk", "Waiting for officer approval before any alert goes out")
-    return case_id
+    return case_id, token
+
+
+def public_status(token: str):
+    """What a parent may see about their own report: progress only, no details."""
+    case = db.one("select id, status, stage, zone, created_at, approved_at, sighted_at, closed_at, close_note "
+                  "from cases where public_token = %s", token)
+    if not case:
+        return None
+    if case["status"] == "review":
+        step = "checking"
+    elif case["status"] == "rejected":
+        step = "rejected"
+    elif case["status"] == "closed":
+        step = "found"
+    elif case["sighted_at"]:
+        step = "sighted"
+    else:
+        step = ["zone", "all_zones", "police"][case["stage"]]
+    return {"case_id": case["id"], "step": step, "zone": case["zone"],
+            "created_at": case["created_at"].isoformat(),
+            "approved_at": case["approved_at"].isoformat() if case["approved_at"] else None,
+            "closed_at": case["closed_at"].isoformat() if case["closed_at"] else None}
 
 
 def get_case(case_id: int):
@@ -87,18 +111,22 @@ def reject(case_id: int, officer: str, reason: str) -> bool:
     return True
 
 
+def route_for(case_id, score) -> str:
+    """Where a sighting goes. Anything uncertain goes to a person."""
+    if score is None:
+        return "review"
+    if case_id and score >= LIKELY:
+        return "likely"
+    if case_id and score >= UNSURE:
+        return "review"
+    return "unmatched"
+
+
 def new_sighting(text: str, zone: str, reporter: str) -> dict:
     open_cases = db.all("select * from cases where status = 'active' order by id")
     result = agents.match(text, zone, open_cases)
     score = result["score"]
-    if score is None:
-        route = "review"
-    elif result["case_id"] and score >= LIKELY:
-        route = "likely"
-    elif result["case_id"] and score >= UNSURE:
-        route = "review"
-    else:
-        route = "unmatched"
+    route = route_for(result["case_id"], score)
     row = db.run(
         "insert into sightings (case_id, text, zone, reporter, score, reasons, route) values (%s, %s, %s, %s, %s, %s, %s) returning id",
         result["case_id"], text, zone, reporter or None, score, db.as_json(result["reasons"]), route,

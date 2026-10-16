@@ -1,37 +1,142 @@
 {% extends "base.html" %}
-{% block nav %}<nav class="nav"><a href="/desk">Security desk</a></nav>{% endblock %}
+{% block head %}
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+               "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
+</script>
+{% endblock %}
 {% block content %}
-<main class="home">
+<main>
   <section class="hero">
-    <p class="eyebrow">Lost-child desk for malls, airports, stadiums and festivals</p>
-    <h1>The first ten minutes decide how a lost child is found.</h1>
-    <p class="lede">Most venues still run that search on radios and paper. Talaash lets AI do the coordination while people make every call that matters.</p>
-    <div class="actions">
-      <a class="btn btn-alert" href="/report">Report a missing child</a>
-      <a class="btn btn-quiet" href="/sighting">Staff: report a sighting</a>
+    <div>
+      <p class="eyebrow reveal">Lost-child response for crowded venues</p>
+      <h1 class="reveal d1">Find them in the <em>first ten minutes.</em></h1>
+      <p class="lede reveal d2">When a child goes missing at a mall, airport or stadium, most venues still run the search on radios and paper. Talaash lets AI agents coordinate it, while a person approves every call that matters.</p>
+      <div class="hero-actions reveal d3">
+        <a class="btn btn-signal" href="/report">Report a missing child <span class="arrow">→</span></a>
+        <a class="btn btn-ghost" href="/sighting">Staff: report a sighting</a>
+      </div>
+      <ul class="trust reveal d4">
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Every alert approved by a person</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Reports in any language</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Alerts withdrawn once found</li>
+      </ul>
+    </div>
+    <div class="stage reveal d2" id="stage" aria-label="Animated venue map showing a search widening from the food court">
+      <canvas id="venue"></canvas>
+      <div class="chip-float chip-a" data-phase="0"><span class="pip"></span><span><b>Case #12</b> · Food Court</span><span class="mono">00:41</span></div>
+      <div class="chip-float chip-b" data-phase="1"><span class="pip"></span><span><b>Officer approved</b> · zone alert out</span></div>
+      <div class="chip-float chip-c" data-phase="2"><span class="pip"></span><span><b>Sighting at Gate 3</b> · 86% match</span></div>
+      <div class="chip-float chip-d" data-phase="3"><span class="pip"></span><span><b>Found</b> · alerts withdrawn</span></div>
     </div>
   </section>
 
-  <section class="split">
-    <div>
-      <h2>What the AI does</h2>
-      <ul class="plain">
-        <li>Turns a frightened parent’s words, in any language, into a clean case.</li>
-        <li>A second model from a different family checks it against the parent’s exact words.</li>
-        <li>Matches staff sightings to open cases and scores how sure it is.</li>
-        <li>Runs the clock: widens the search, then calls in the police.</li>
-      </ul>
+  <section class="section" id="how">
+    <div class="section-head">
+      <p class="kicker reveal">How a search runs</p>
+      <h2 class="reveal d1">From a parent’s words to a reunion, one clear path.</h2>
+      <p class="reveal d2">Each step is done by the agent best suited to it, and the decisions that carry risk wait for a person.</p>
     </div>
-    <div>
-      <h2>What people decide</h2>
-      <ul class="plain">
-        <li>Nothing is broadcast until the desk officer approves it.</li>
-        <li>Unsure matches go to a person, never straight to the parent.</li>
-        <li>Only a person can close a case. Every alert is then withdrawn.</li>
-        <li>Every agent decision and human action is logged.</li>
-      </ul>
+    <div class="steps-track" id="steps">
+      <div class="steps-line"><i></i></div>
+      <div class="step reveal"><div class="num">01</div><h3>The parent reports</h3><p>In their own words, any language, from their phone. No forms to fight with.</p><span class="who ai">Intake agent</span></div>
+      <div class="step reveal d1"><div class="num">02</div><h3>A second model checks</h3><p>A different model family compares every detail with the parent’s exact words and flags contradictions.</p><span class="who ai">Verifier agent</span></div>
+      <div class="step reveal d2"><div class="num">03</div><h3>The officer approves</h3><p>Nothing reaches guards until the desk officer fixes the details and presses approve.</p><span class="who person">Desk officer</span></div>
+      <div class="step reveal d3"><div class="num">04</div><h3>The search widens</h3><p>Guards report what they see. Sightings are scored; the clock widens the search, then calls the police.</p><span class="who ai">Matcher + Watcher</span></div>
+      <div class="step reveal d4"><div class="num">05</div><h3>Found, and cleaned up</h3><p>A person closes the case. Every alert is edited to resolved and the child’s details are removed.</p><span class="who person">Desk officer</span></div>
     </div>
   </section>
-  <p class="foot">Built for Agentika 2.0 at NaSCon’26 · Human + AI: Better Together · SDG 16.2</p>
+
+  <div class="band" id="people">
+    <section class="section">
+      <div class="section-head">
+        <p class="kicker reveal">Human + AI, better together</p>
+        <h2 class="reveal d1">Agents coordinate. People decide.</h2>
+        <p class="reveal d2">Full autonomy is the wrong goal when a child’s safety is at stake. Talaash gives the speed to AI and the judgment to people.</p>
+      </div>
+      <div class="split">
+        <div class="side ai reveal">
+          <h3>What the agents do</h3>
+          <p class="sub">Fast, tireless, never panicked</p>
+          <ul>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h7"/></svg>Turn a frightened, messy report into a clean case in seconds</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>Check it against the parent’s exact words</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v18M3 12h18"/></svg>Score every guard sighting against open cases</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Run the clock and escalate without being asked</li>
+          </ul>
+        </div>
+        <div class="handoff" aria-hidden="true">
+          <svg viewBox="0 0 64 220"><path class="flow" d="M32 10 V210" stroke="#f39a7d" stroke-width="2" fill="none"/><circle cx="32" cy="110" r="14" fill="#13202f" stroke="#f39a7d" stroke-width="2"/><path d="M26 110h12M33 104l6 6-6 6" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="side people reveal d2">
+          <h3>What people decide</h3>
+          <p class="sub">The calls that carry risk</p>
+          <ul>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>Approve every broadcast. A prank or custody dispute never goes out</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>Confirm uncertain sightings before anyone acts on them</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg>Reject reports that don’t add up</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Close the case. Only a person can say a child is safe</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="section">
+    <div class="section-head">
+      <p class="kicker reveal">The agents</p>
+      <h2 class="reveal d1">Five specialists, one desk.</h2>
+    </div>
+    <div class="agents">
+      <article class="agent tilt reveal"><div class="glyph g-signal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h7"/></svg></div><h3>Intake</h3><p>Reads the report in any language and fills only what was said. Missing beats invented.</p><p class="model">gpt-oss-120b · Groq</p></article>
+      <article class="agent tilt reveal d1"><div class="glyph g-amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></div><h3>Verifier</h3><p>A different model family checks every field and quotes the evidence.</p><p class="model">Gemini · plus code checks</p></article>
+      <article class="agent tilt reveal d2"><div class="glyph g-sky"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/></svg></div><h3>Matcher</h3><p>Scores sightings. Sure ones alert the officer; unsure ones wait for a person.</p><p class="model">gpt-oss-120b · Groq</p></article>
+      <article class="agent tilt reveal d3"><div class="glyph g-ink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><h3>Watcher</h3><p>Widens the alert to every zone, then brings in the police, unless someone is found.</p><p class="model">runs on its own</p></article>
+      <article class="agent tilt reveal d4"><div class="glyph g-sage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 12h8M12 8v8"/><rect x="3" y="3" width="18" height="18" rx="5"/></svg></div><h3>Guard assistant</h3><p>Chats with guards in Discord, looks up cases and files sightings. It can’t approve anything.</p><p class="model">tool-using agent · MCP</p></article>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top:0">
+    <div class="section-head">
+      <p class="kicker reveal">Built to plug in</p>
+      <h2 class="reveal d1">Works with what venues already use.</h2>
+    </div>
+    <div class="plug">
+      <div class="plug-card reveal"><span class="tag">alerts</span><h3>Discord channels</h3><p>Alerts land in the security team’s channels and get edited to resolved when the case closes.</p></div>
+      <div class="plug-card reveal d1"><span class="tag">/mcp</span><h3>MCP server</h3><p>Any MCP-capable assistant can list cases and file sightings, with the same limits as the guards.</p></div>
+      <div class="plug-card reveal d2"><span class="tag">deploy</span><h3>Alternate Clouds</h3><p>Runs as one container on decentralised compute, so the clock keeps ticking around the clock.</p></div>
+      <div class="plug-card reveal d3"><span class="tag">any phone</span><h3>No app to install</h3><p>Parents and guards use a link. The desk runs in any browser.</p></div>
+    </div>
+  </section>
+
+  <section class="section" id="safety" style="padding-top:0">
+    <div class="safety">
+      <div class="section-head">
+        <p class="kicker reveal">Safety and privacy</p>
+        <h2 class="reveal d1">Designed for the worst day of someone’s life.</h2>
+        <p class="reveal d2">A lost-child tool can be misused. These rules are built into the system, not left to policy.</p>
+      </div>
+      <div class="safety-list">
+        <div class="reveal"><b>No broadcast without approval</b><span>Stops prank reports and a parent in a custody dispute using staff to track a child.</span></div>
+        <div class="reveal d1"><b>Closed channels only</b><span>Alerts go to venue security, never to the public.</span></div>
+        <div class="reveal d2"><b>No face recognition</b><span>Matching uses clothing, age and what guards describe.</span></div>
+        <div class="reveal d3"><b>Details removed on close</b><span>Every alert is edited to resolved the moment a child is found.</span></div>
+        <div class="reveal d4"><b>Everything is logged</b><span>Each agent decision and human action is on the record.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-band reveal">
+    <svg class="rings" viewBox="0 0 200 200" aria-hidden="true"><circle cx="100" cy="100" r="30" fill="none" stroke="#fff" stroke-width="2"/><circle cx="100" cy="100" r="60" fill="none" stroke="#fff" stroke-width="2"/><circle cx="100" cy="100" r="90" fill="none" stroke="#fff" stroke-width="2"/></svg>
+    <h2>Every minute counts. Start the search now.</h2>
+    <div class="hero-actions" style="margin:0">
+      <a class="btn" href="/report">Report a missing child <span class="arrow">→</span></a>
+      <a class="btn btn-ghost" href="/login">Open the desk</a>
+    </div>
+  </section>
 </main>
+{% endblock %}
+{% block scripts %}
+<script src="/static/site.js?v=3"></script>
+<script type="module" src="/static/venue3d.js?v=3"></script>
 {% endblock %}

@@ -1,28 +1,68 @@
-{% extends "base.html" %}
-{% block title %}Security desk · Talaash{% endblock %}
-{% block bodyclass %}desk-body{% endblock %}
-{% block nav %}
-<div class="desk-meta">
-  <span class="live"><span class="dot"></span><span id="clock">--:--:--</span></span>
-  <span class="who">{{ officer }}</span>
-  <a href="/logout">Log out</a>
-</div>
-{% endblock %}
-{% block content %}
-<main class="desk" data-steps="{{ steps|join(',') }}">
-  <section class="col">
-    <h2>Needs your decision <span class="count" id="needs-count">0</span></h2>
-    <div id="needs"><p class="empty">Nothing waiting.</p></div>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Desk · Talaash</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/desk.css?v=3">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2313202f'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23e2552d'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23e2552d' stroke-opacity='.55' stroke-width='2'/%3E%3C/svg%3E">
+</head>
+<body data-steps="{{ steps|join(',') }}" data-zones="{{ zones|join('|') }}">
+<header class="bar">
+  <a class="brand" href="/" title="Talaash home">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#24364a"/><circle cx="16" cy="16" r="4" fill="#e2552d"/><circle class="ring" cx="16" cy="16" r="9" fill="none" stroke="#e2552d" stroke-width="2"/></svg>
+    <span>Talaash <em>Desk</em></span>
+  </a>
+  <div class="stats" role="group" aria-label="Live counts">
+    <button class="stat s-amber" data-filter="needs"><b id="st-needs">0</b><span>Waiting for you</span></button>
+    <button class="stat s-signal" data-filter="active"><b id="st-active">0</b><span>Active searches</span></button>
+    <button class="stat s-sky" data-filter="needs"><b id="st-sight">0</b><span>Sightings to check</span></button>
+    <button class="stat s-sage" data-filter="closed"><b id="st-found">0</b><span>Found today</span></button>
+  </div>
+  <div class="bar-right">
+    <span class="live" title="Connected"><i id="live-dot"></i><span id="clock">--:--:--</span></span>
+    <span class="officer"><span class="avatar">{{ officer[:1]|upper }}</span>{{ officer }}</span>
+    <a class="logout" href="/logout">Log out</a>
+  </div>
+</header>
+
+<main class="desk">
+  <aside class="queue">
+    <div class="tabs" role="tablist">
+      <button role="tab" data-tab="needs" class="on">Needs you <span id="tab-needs">0</span></button>
+      <button role="tab" data-tab="active">Active <span id="tab-active">0</span></button>
+      <button role="tab" data-tab="closed">Closed <span id="tab-closed">0</span></button>
+    </div>
+    <ul class="items" id="items"></ul>
+    <p class="keys"><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>A</kbd> approve · <kbd>C</kbd> confirm · <kbd>F</kbd> found</p>
+  </aside>
+
+  <section class="detail" id="detail" aria-live="polite">
+    <div class="empty-state">
+      <svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="18" fill="none" stroke="#cfc6b3" stroke-width="2"/><circle cx="60" cy="60" r="38" fill="none" stroke="#ddd5c4" stroke-width="2"/><circle cx="60" cy="60" r="56" fill="none" stroke="#e8e1d2" stroke-width="2"/><circle cx="60" cy="60" r="5" fill="#2f7d6b"/></svg>
+      <h2>All quiet.</h2>
+      <p>New reports and sightings appear on the left the moment they arrive.</p>
+    </div>
   </section>
-  <section class="col">
-    <h2>Active searches <span class="count" id="active-count">0</span></h2>
-    <div id="active"><p class="empty">No active searches.</p></div>
-  </section>
-  <section class="col col-log">
-    <h2>Activity</h2>
-    <ol id="log" class="log"></ol>
-  </section>
+
+  <aside class="side">
+    <div class="card map-card">
+      <div class="card-head"><h3>Venue</h3><span class="legend"><i class="lg-case"></i>Case <i class="lg-sight"></i>Sighting <i class="lg-wide"></i>Search area</span></div>
+      <svg id="map" viewBox="0 0 400 300" role="img" aria-label="Venue map with cases and sightings"></svg>
+    </div>
+    <div class="card feed-card">
+      <div class="card-head"><h3>Activity</h3>
+        <div class="seg" role="group"><button data-feed="all" class="on">All</button><button data-feed="ai">AI</button><button data-feed="human">People</button></div>
+      </div>
+      <ol class="feed" id="feed"></ol>
+    </div>
+  </aside>
 </main>
-<p id="toast" class="toast" hidden></p>
-<script src="/static/desk.js"></script>
-{% endblock %}
+<div class="toast" id="toast" hidden></div>
+<dialog id="ask"><form method="dialog"><h3 id="ask-title"></h3><p id="ask-text"></p><textarea id="ask-input" rows="3"></textarea><div class="dlg-actions"><button value="cancel" class="btn ghost">Cancel</button><button value="ok" class="btn" id="ask-ok">Confirm</button></div></form></dialog>
+<script src="/static/desk.js?v=3"></script>
+</body>
+</html>

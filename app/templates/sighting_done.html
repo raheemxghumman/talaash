@@ -1,22 +1,33 @@
 {% extends "base.html" %}
 {% block title %}Sighting sent · Talaash{% endblock %}
+{% block nav %}<a class="nav-cta" href="/sighting">New sighting</a>{% endblock %}
 {% block content %}
-<main class="narrow">
-  {% if result.route == "likely" %}
-    <p class="case-no">Case #{{ result.case_id }}</p>
-    <h1>This looks like a missing child.</h1>
-    <p class="lede small">The desk officer has been alerted and will confirm. Stay close and keep the child in sight. Don’t move them unless they’re in danger.</p>
-  {% elif result.route == "review" %}
-    {% if result.case_id %}<p class="case-no">Possible match · Case #{{ result.case_id }}</p>{% endif %}
-    <h1>Sent to the desk for a decision.</h1>
-    <p class="lede small">It may be a match, but it isn’t clear. An officer will look at it now. Keep watching if you can.</p>
-  {% else %}
-    <h1>No open case matches this.</h1>
-    <p class="lede small">It’s logged. If the child seems lost, stay with them and call the desk on the radio.</p>
-  {% endif %}
-  {% if result.reasons %}
-  <ul class="plain small-list">{% for r in result.reasons %}<li>{{ r }}</li>{% endfor %}</ul>
-  {% endif %}
-  <a class="btn btn-quiet" href="/sighting">Report another sighting</a>
+{% set pct = ((result.score or 0) * 100)|round|int %}
+<main class="page">
+  <div class="panel">
+    {% if result.route == "likely" %}
+      <div class="result-head"><div class="result-icon g-sky"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/></svg></div>
+        <div><span class="case-chip" style="margin:0;background:var(--sky-soft);color:var(--sky)">Case #{{ result.case_id }}</span></div></div>
+      <h1>This looks like a missing child.</h1>
+      <p class="lede">The desk officer has been alerted and will confirm. Stay close and keep the child in sight. Don’t move them unless they’re in danger.</p>
+    {% elif result.route == "review" %}
+      <div class="result-head"><div class="result-icon g-amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 8v5M12 16.5h.01"/><circle cx="12" cy="12" r="9"/></svg></div>
+        {% if result.case_id %}<div><span class="case-chip" style="margin:0;background:var(--amber-soft);color:var(--amber)">Possible match · Case #{{ result.case_id }}</span></div>{% endif %}</div>
+      <h1>Sent to the desk for a decision.</h1>
+      <p class="lede">It might be a match, but it isn’t clear. An officer is looking at it now. Keep watching if you can.</p>
+    {% else %}
+      <div class="result-head"><div class="result-icon g-ink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg></div></div>
+      <h1>No open case matches this.</h1>
+      <p class="lede">It’s logged. If the child seems lost, stay with them and call the desk on the radio.</p>
+    {% endif %}
+    {% if result.score is not none %}
+      <div style="display:flex;justify-content:space-between;font-size:14px;color:var(--muted)"><span>Match confidence</span><b style="color:var(--ink)">{{ pct }}%</b></div>
+      <div class="meter"><i data-w="{{ pct }}%" style="background:{% if result.route == 'likely' %}var(--sky){% elif result.route == 'review' %}var(--amber){% else %}var(--line-2){% endif %}"></i></div>
+    {% endif %}
+    {% if result.reasons %}<ul class="reasons">{% for r in result.reasons %}<li>{{ r }}</li>{% endfor %}</ul>{% endif %}
+  </div>
+  <p class="fine"><a href="/sighting">Report another sighting</a></p>
 </main>
 {% endblock %}
+{% block footer %}{% endblock %}
+{% block scripts %}<script src="/static/site.js?v=3"></script>{% endblock %}
