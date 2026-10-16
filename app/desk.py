@@ -223,7 +223,10 @@ def reunite(match_id: int, officer: str, note: str, identity_checked: bool) -> s
     cases = [get_case(m["missing_id"]), get_case(m["found_id"])]
     if any(c is None or c["status"] not in ("review", "active") for c in cases):
         return "One of these cases is no longer open."
-    db.run("update matches set decision = 'confirmed', decided_by = %s, decided_at = now() where id = %s", officer, match_id)
+    claimed = db.run("update matches set decision = 'confirmed', decided_by = %s, decided_at = now() where id = %s and decision is null returning id",
+                     officer, match_id)
+    if not claimed:
+        return "This match was already decided."
     db.run("""update matches set decision = 'dismissed', decided_by = %s, decided_at = now()
               where id <> %s and decision is null and (missing_id in (%s, %s) or found_id in (%s, %s))""",
            officer, match_id, m["missing_id"], m["found_id"], m["missing_id"], m["found_id"])
@@ -284,10 +287,12 @@ def approve(case_id: int, officer: str, edits: dict) -> bool:
         if value != x.get(key):
             changed.append(key)
             x[key] = value
-    db.run(
-        "update cases set extracted = %s, status = 'active', stage = 0, approved_at = now(), approved_by = %s where id = %s and status = 'review'",
+    claimed = db.run(
+        "update cases set extracted = %s, status = 'active', stage = 0, approved_at = now(), approved_by = %s where id = %s and status = 'review' returning id",
         db.as_json(x), officer, case_id,
     )
+    if not claimed:
+        return False
     if changed:
         db.log(case_id, officer, "Corrected the case", ", ".join(changed))
     db.log(case_id, officer, "Approved the broadcast")
@@ -302,7 +307,9 @@ def dispatch(case_id: int, officer: str) -> bool:
     case = get_case(case_id)
     if not case or case["status"] != "review" or case["kind"] != "found":
         return False
-    db.run("update cases set status = 'active', approved_at = now(), approved_by = %s where id = %s and status = 'review'", officer, case_id)
+    if not db.run("update cases set status = 'active', approved_at = now(), approved_by = %s where id = %s and status = 'review' returning id",
+                  officer, case_id):
+        return False
     db.log(case_id, officer, "Sent staff to the finder")
     finder = (case["reporter_name"] or "").split()
     notify.send(case, "desk", "found", f"FOUND CHILD · Case #{case_id}",
@@ -325,7 +332,9 @@ def collect(case_id: int, who: str) -> str | None:
         return f"Found child #{case_id} is already {'closed' if case['status'] == 'closed' else case['status']}."
     if case["collected_at"]:
         return f"Staff already have found child #{case_id} ({case['collected_by']})."
-    db.run("update cases set collected_at = now(), collected_by = %s where id = %s and collected_at is null", who[:80], case_id)
+    if not db.run("update cases set collected_at = now(), collected_by = %s where id = %s and collected_at is null and status = 'active' returning id",
+                  who[:80], case_id):
+        return f"Found child #{case_id} was just updated by someone else."
     db.log(case_id, who, "Has the child, the finder can go", f"at {case['zone']}")
     notify.send(case, "desk", "found", f"CHILD WITH STAFF · Found child #{case_id}",
                 f"**{who}** has the found child from {case['zone']}. No one else needs to go. Bring the child to the security desk.",
@@ -338,11 +347,13 @@ def reject(case_id: int, officer: str, reason: str) -> bool:
     case = get_case(case_id)
     if not case or case["status"] != "review":
         return False
-    db.run("update cases set status = 'rejected', closed_at = now(), closed_by = %s, close_note = %s, photo_id = null where id = %s",
-           officer, reason or None, case_id)
+    if not db.run("""update cases set status = 'rejected', closed_at = now(), closed_by = %s, close_note = %s, photo_id = null
+                     where id = %s and status = 'review' returning id""", officer, reason or None, case_id):
+        return False
     photos.delete(case["photo_id"])
     db.run("update matches set decision = 'dismissed', decided_by = %s, decided_at = now() where decision is null and (missing_id = %s or found_id = %s)",
            officer, case_id, case_id)
+    db.run("update sightings set decision = 'closed', decided_by = 'Closer', decided_at = now() where case_id = %s and decision is null", case_id)
     what = "Rejected the report, nothing was broadcast" if case["kind"] == "missing" else "Rejected the found-child report"
     db.log(case_id, officer, what, reason or None)
     return True
@@ -386,8 +397,13 @@ def decide_sighting(sighting_id: int, officer: str, decision: str) -> bool:
     s = db.one("select * from sightings where id = %s", sighting_id)
     if not s or s["decision"]:
         return False
-    db.run("update sightings set decision = %s, decided_by = %s, decided_at = now() where id = %s",
-           decision, officer, sighting_id)
+    if decision == "confirmed" and s["case_id"]:
+        owner = get_case(s["case_id"])
+        if not owner or owner["status"] != "active":
+            return False
+    if not db.run("update sightings set decision = %s, decided_by = %s, decided_at = now() where id = %s and decision is null returning id",
+                  decision, officer, sighting_id):
+        return False
     if decision == "confirmed" and s["case_id"]:
         db.run("update cases set sighted_at = now() where id = %s", s["case_id"])
         db.log(s["case_id"], officer, f"Confirmed sighting #{sighting_id}, escalation paused")
@@ -404,22 +420,27 @@ def close(case_id: int, officer: str, note: str) -> bool:
     if not case or case["status"] != "active":
         return False
     note = note or ("Child found and reunited." if case["kind"] == "missing" else "Child handed over.")
+    if not _finish(case, officer, note):
+        return False
     db.log(case_id, officer, "Closed the case", note)
-    _finish(case, officer, note)
     return True
 
 
 def _finish(case: dict, officer: str, note: str):
     """Close one case: withdraw every alert, delete the photo, write the incident report."""
-    db.run("""update cases set status = 'closed', closed_at = now(), closed_by = %s, close_note = %s, photo_id = null
-              where id = %s and status in ('review', 'active')""", officer, note, case["id"])
+    if not db.run("""update cases set status = 'closed', closed_at = now(), closed_by = %s, close_note = %s, photo_id = null
+                     where id = %s and status in ('review', 'active') returning id""", officer, note, case["id"]):
+        return False
     db.run("update matches set decision = 'dismissed', decided_by = %s, decided_at = now() where decision is null and (missing_id = %s or found_id = %s)",
            officer, case["id"], case["id"])
+    # sightings nobody decided on are settled, so they don't sit in the queue forever
+    db.run("update sightings set decision = 'closed', decided_by = 'Closer', decided_at = now() where case_id = %s and decision is null", case["id"])
     notify.withdraw_all(case, note)
     if case.get("photo_id"):
         photos.delete(case["photo_id"])
         db.log(case["id"], "Closer", "Deleted the photo")
     _later(build_report, case["id"])
+    return True
 
 
 # ---------- PA announcements ----------

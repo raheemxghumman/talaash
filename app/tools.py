@@ -85,7 +85,8 @@ def sighting_status(reporter: str) -> list[dict]:
     """What the desk decided about the latest sightings this person filed."""
     rows = db.all("""select id, case_id, zone, text, route, decision, created_at from sightings
                      where reporter = %s order by id desc limit 5""", reporter[:60])
-    outcome = {"confirmed": "Confirmed by the desk officer", "dismissed": "Dismissed by the desk officer"}
+    outcome = {"confirmed": "Confirmed by the desk officer", "dismissed": "Dismissed by the desk officer",
+               "closed": "The case was closed before the desk needed it"}
     waiting = {"likely": "Likely match, waiting for the desk officer", "review": "Possible match, waiting for the desk officer",
                "unmatched": "Did not match any open case"}
     return [{"sighting_id": r["id"], "case_id": r["case_id"], "zone": r["zone"], "what_you_said": r["text"][:120],

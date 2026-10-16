@@ -89,8 +89,9 @@
         input.files = dt.files;
         show(blob, `${Math.max(1, Math.round(blob.size / 1024))} KB · location data removed`);
       } catch (e) {
-        if (file.size <= MAX) show(file, "Ready to send");
-        else fail("We couldn't read this photo. Try a different one.");
+        // the browser couldn't open it (often an iPhone HEIC photo): only send formats the desk can read
+        if (file.size <= MAX && /^image\/(jpeg|png|webp)$/.test(file.type)) show(file, "Ready to send");
+        else fail("This photo format can't be used. Take a screenshot of the photo and add that instead.");
       }
     };
     input.addEventListener("change", () => take(input.files[0]));

@@ -298,10 +298,11 @@
   }
 
   function linkBox(c) {
-    const open = data.cases.filter((x) => x.kind !== "found" && isOpen(x));
-    if (!open.length) return `<div class="box link-box"><h4>${icon.link} Find the parent</h4><p class="muted-line">No open missing-child reports yet. When a parent reports, the matcher compares them with this child straight away.</p></div>`;
+    const found = c.kind === "found";
+    const open = data.cases.filter((x) => (found ? x.kind !== "found" : x.kind === "found") && isOpen(x));
+    if (!open.length) return found ? `<div class="box link-box"><h4>${icon.link} Find the parent</h4><p class="muted-line">No open missing-child reports yet. When a parent reports, the matcher compares them with this child straight away.</p></div>` : "";
     const d = draft(c.id);
-    return `<div class="box link-box"><h4>${icon.link} Link to a missing report <span class="by">if the matcher missed it</span></h4>
+    return `<div class="box link-box"><h4>${icon.link} ${found ? "Link to a missing report" : "Link to a found child"} <span class="by">if the matcher missed it</span></h4>
       <div class="link-row"><select data-keep="link-${c.id}">${open.map((o) => `<option value="${o.id}" ${String(d.__link) === String(o.id) ? "selected" : ""}>#${o.id} · ${esc(who(o.extracted))} · ${esc(o.zone)}</option>`).join("")}</select>
       <button class="btn ghost" data-act="link">Compare side by side</button></div></div>`;
   }
@@ -380,6 +381,7 @@
       </div>
       ${c.photo_id ? `<div class="grid2">${photoBox(c)}${historyBox(signals)}</div>` : historyBox(signals)}
       ${checkerBox(v, issues, "Every detail matches the parent’s words.")}
+      ${linkBox(c)}
       ${notesBox(c)}
       <div class="decide">
         ${needsAck ? `<label class="ack"><input type="checkbox" id="ack" ${d.__ack ? "checked" : ""}> I’ve checked the warnings${warns.length ? " and spoken to the reporter" : ""}</label>` : '<span style="margin-right:auto"></span>'}
@@ -515,7 +517,7 @@
       ${pct != null ? `<div class="bar-meter"><div class="m"><i style="width:${pct}%;background:${color}"></i></div><span>${pct}%</span></div>` : '<div class="bar-meter"><span>Matcher unavailable</span></div>'}
       ${(s.reasons || []).length ? `<ul>${s.reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>` : ""}
       ${open ? `<div class="acts">${s.case_id ? `<button class="btn sky" data-act="confirm" data-id="${s.id}">Confirm sighting <span class="k">C</span></button>` : ""}<button class="btn ghost" data-act="dismiss" data-id="${s.id}">Not our child</button></div>`
-        : s.decision ? `<div class="done-note" style="color:${s.decision === "confirmed" ? "var(--sage)" : "var(--muted)"}">${s.decision === "confirmed" ? "Confirmed" : "Dismissed"} by ${esc(s.decided_by)} · ${hm(s.decided_at)}</div>` : ""}
+        : s.decision ? `<div class="done-note" style="color:${s.decision === "confirmed" ? "var(--sage)" : "var(--muted)"}">${s.decision === "closed" ? "Settled when the case closed" : (s.decision === "confirmed" ? "Confirmed" : "Dismissed") + " by " + esc(s.decided_by)} · ${hm(s.decided_at)}</div>` : ""}
     </div>`;
   }
 
@@ -562,6 +564,7 @@
         </div>
       </div>
       ${photoBox(c)}
+      ${c.status === "active" ? linkBox(c) : ""}
       ${paBox(c)}
       ${notesBox(c)}
       <div class="box"><h4>Timeline</h4>${timelineHtml(c.id)}</div>
@@ -728,8 +731,9 @@
       } else if (what === "pa-stop") {
         speechSynthesis.cancel(); speaking = null; markSpeaking();
       } else if (what === "link") {
-        const missingId = +$("#detail select[data-keep^='link-']").value;
-        const out = await post("/api/matches/link", { missing_id: missingId, found_id: c.id });
+        const other = +$("#detail select[data-keep^='link-']").value;
+        const pair = c.kind === "found" ? { missing_id: other, found_id: c.id } : { missing_id: c.id, found_id: other };
+        const out = await post("/api/matches/link", pair);
         await refresh(); select(`m:${out.id}`);
       } else if (what === "m-dismiss") {
         await post(`/api/matches/${item.id}/dismiss`);
