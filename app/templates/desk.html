@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Security desk · Talaash{% endblock %}
+{% block bodyclass %}desk-body{% endblock %}
+{% block nav %}
+<div class="desk-meta">
+  <span class="live"><span class="dot"></span><span id="clock">--:--:--</span></span>
+  <span class="who">{{ officer }}</span>
+  <a href="/logout">Log out</a>
+</div>
+{% endblock %}
+{% block content %}
+<main class="desk" data-steps="{{ steps|join(',') }}">
+  <section class="col">
+    <h2>Needs your decision <span class="count" id="needs-count">0</span></h2>
+    <div id="needs"><p class="empty">Nothing waiting.</p></div>
+  </section>
+  <section class="col">
+    <h2>Active searches <span class="count" id="active-count">0</span></h2>
+    <div id="active"><p class="empty">No active searches.</p></div>
+  </section>
+  <section class="col col-log">
+    <h2>Activity</h2>
+    <ol id="log" class="log"></ol>
+  </section>
+</main>
+<p id="toast" class="toast" hidden></p>
+<script src="/static/desk.js"></script>
+{% endblock %}

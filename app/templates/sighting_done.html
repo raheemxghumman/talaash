@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Sighting sent · Talaash{% endblock %}
+{% block content %}
+<main class="narrow">
+  {% if result.route == "likely" %}
+    <p class="case-no">Case #{{ result.case_id }}</p>
+    <h1>This looks like a missing child.</h1>
+    <p class="lede small">The desk officer has been alerted and will confirm. Stay close and keep the child in sight. Don’t move them unless they’re in danger.</p>
+  {% elif result.route == "review" %}
+    {% if result.case_id %}<p class="case-no">Possible match · Case #{{ result.case_id }}</p>{% endif %}
+    <h1>Sent to the desk for a decision.</h1>
+    <p class="lede small">It may be a match, but it isn’t clear. An officer will look at it now. Keep watching if you can.</p>
+  {% else %}
+    <h1>No open case matches this.</h1>
+    <p class="lede small">It’s logged. If the child seems lost, stay with them and call the desk on the radio.</p>
+  {% endif %}
+  {% if result.reasons %}
+  <ul class="plain small-list">{% for r in result.reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+  {% endif %}
+  <a class="btn btn-quiet" href="/sighting">Report another sighting</a>
+</main>
+{% endblock %}

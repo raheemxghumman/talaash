@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Desk login · Talaash{% endblock %}
+{% block content %}
+<main class="narrow">
+  <h1>Security desk</h1>
+  <p class="lede small">For the officer on duty.</p>
+  {% if error %}<p class="notice notice-bad">Wrong username or password.</p>{% endif %}
+  <form method="post" action="/login" class="form">
+    <label>Your name (shown in the log) <input name="name" required placeholder="e.g. Officer Sara"></label>
+    <label>Username <input name="username" required autocomplete="username"></label>
+    <label>Password <input name="password" type="password" required autocomplete="current-password"></label>
+    <button class="btn btn-dark btn-wide" type="submit">Open the desk</button>
+  </form>
+</main>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Report a sighting · Talaash{% endblock %}
+{% block content %}
+<main class="narrow">
+  <h1>Report a sighting</h1>
+  <p class="lede small">For venue staff. Say what you see, even if you’re not sure. The desk decides.</p>
+  {% if error %}<p class="notice notice-bad">{{ error }}</p>{% endif %}
+  <form method="post" action="/sighting" class="form" data-busy="Checking open cases…">
+    <label>What do you see?
+      <textarea name="text" rows="4" required minlength="5" placeholder="e.g. small boy in a red shirt crying alone near the escalator">{{ text or "" }}</textarea>
+    </label>
+    <label>Your zone
+      <select name="zone" required>
+        <option value="" disabled {% if not zone %}selected{% endif %}>Choose your zone</option>
+        {% for z in zones %}<option {% if z == zone %}selected{% endif %}>{{ z }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Your name or radio call sign <input name="reporter"></label>
+    <button class="btn btn-dark btn-wide" type="submit">Send sighting</button>
+  </form>
+</main>
+<script src="/static/forms.js"></script>
+{% endblock %}

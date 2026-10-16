@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Report a missing child · Talaash{% endblock %}
+{% block bodyclass %}narrow-page{% endblock %}
+{% block content %}
+<main class="narrow">
+  <h1>Report a missing child</h1>
+  <p class="lede small">Tell us in your own words, in any language. Security sees this right away.</p>
+  {% if error %}<p class="notice notice-bad">{{ error }}</p>{% endif %}
+  <form method="post" action="/report" class="form" data-busy="Sending to the security desk…">
+    <label>Describe your child
+      <textarea name="description" rows="6" required minlength="15" placeholder="Name, age, what they are wearing, anything that stands out, when you last saw them.">{{ description or "" }}</textarea>
+    </label>
+    <label>Where did you last see them?
+      <select name="zone" required>
+        <option value="" disabled {% if not zone %}selected{% endif %}>Choose a place</option>
+        {% for z in zones %}<option {% if z == zone %}selected{% endif %}>{{ z }}</option>{% endfor %}
+      </select>
+    </label>
+    <div class="row">
+      <label>Your name <input name="reporter_name" autocomplete="name"></label>
+      <label>Your phone <input name="reporter_phone" type="tel" autocomplete="tel"></label>
+    </div>
+    <button class="btn btn-alert btn-wide" type="submit">Send to security</button>
+    <p class="hint">Stay where you are if you can. A staff member will come to you.</p>
+  </form>
+</main>
+<script src="/static/forms.js"></script>
+{% endblock %}

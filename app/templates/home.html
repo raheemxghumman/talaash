@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block nav %}<nav class="nav"><a href="/desk">Security desk</a></nav>{% endblock %}
+{% block content %}
+<main class="home">
+  <section class="hero">
+    <p class="eyebrow">Lost-child desk for malls, airports, stadiums and festivals</p>
+    <h1>The first ten minutes decide how a lost child is found.</h1>
+    <p class="lede">Most venues still run that search on radios and paper. Talaash lets AI do the coordination while people make every call that matters.</p>
+    <div class="actions">
+      <a class="btn btn-alert" href="/report">Report a missing child</a>
+      <a class="btn btn-quiet" href="/sighting">Staff: report a sighting</a>
+    </div>
+  </section>
+
+  <section class="split">
+    <div>
+      <h2>What the AI does</h2>
+      <ul class="plain">
+        <li>Turns a frightened parent’s words, in any language, into a clean case.</li>
+        <li>A second model from a different family checks it against the parent’s exact words.</li>
+        <li>Matches staff sightings to open cases and scores how sure it is.</li>
+        <li>Runs the clock: widens the search, then calls in the police.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>What people decide</h2>
+      <ul class="plain">
+        <li>Nothing is broadcast until the desk officer approves it.</li>
+        <li>Unsure matches go to a person, never straight to the parent.</li>
+        <li>Only a person can close a case. Every alert is then withdrawn.</li>
+        <li>Every agent decision and human action is logged.</li>
+      </ul>
+    </div>
+  </section>
+  <p class="foot">Built for Agentika 2.0 at NaSCon’26 · Human + AI: Better Together · SDG 16.2</p>
+</main>
+{% endblock %}
