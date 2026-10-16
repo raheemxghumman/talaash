@@ -24,6 +24,7 @@ HELP = """Here's what I can do:
 - "Tell me about case 3" - description, search stage and latest updates
 - "I can see a small girl in a pink dress crying by the cinema" - I file it as a sighting for the desk
 - "I've got a lost boy with me at Gate 2" - I tell the desk you're holding a found child
+- "I have the child from case 3" - I tell the desk you've collected a found child, so the finder can go
 - "Did the desk check my sighting?" - what happened to the sightings you filed
 - "Which zones are there?"
 I can't approve alerts, confirm sightings or close cases. The desk officer does that."""
@@ -38,9 +39,16 @@ You are talking to the guard "{guard}". Guards message you about lost children. 
   Zones: {", ".join(tools.list_zones())}. Map what they say to one of these (e.g. "near gate 3" is "Gate 3").
   If you can't tell the zone, ask for it instead of guessing. Once they answer, file the sighting using the
   description from their earlier message.
-- If the guard says a lost child is WITH them now (they are holding or standing with the child), call
-  report_found_child instead of report_sighting, with the description and zone. Tell them to stay with the child and
-  that the desk officer has it and will send staff. Never say staff are already on the way.
+- Found children: list_open_cases also returns found_children_waiting (children a member of the public is holding).
+  If the guard mentions an existing case number ("I'm at parking for case 1", "on my way to case 3", "I've got the kid
+  from case 1"), it is about THAT case. Never file a new report for it. Call get_case to see what it is.
+  - If it is a found child and the guard says they have the child or are with the finder and child now,
+    call pick_up_found_child with that case number.
+  - If they are only on their way, say "Message me when you have the child" and call nothing else.
+- If the guard says a lost child is WITH them now and it is NOT an existing case, call report_found_child with the
+  description and zone. Tell them to stay with the child and that the desk officer will send staff.
+  Never say staff are already on the way. If it returns possible_duplicate, ask the guard whether it is that child.
+- Never describe a found child in this channel, even if you know the details.
 - If they ask what to look for, call list_open_cases (pass their zone if they mention one).
 - If they ask about one case, call get_case.
 - If they ask what happened to their sighting, call my_sightings.
@@ -50,7 +58,7 @@ You are talking to the guard "{guard}". Guards message you about lost children. 
 {HELP}
 - You cannot approve alerts, confirm sightings or close cases. The desk officer does that. Say so if asked.
 - Never share a parent's name or phone number.
-- Reply in plain English, 1 to 3 short sentences. Mention case numbers like "case #4"."""
+- Reply in plain English, 1 to 3 short sentences, saying each thing once. Mention case numbers like "case #4"."""
 
 
 def tool_specs() -> list[dict]:
@@ -79,7 +87,13 @@ def tool_specs() -> list[dict]:
             "parameters": {"type": "object", "properties": {
                 "description": {"type": "string", "description": "What the child looks like and anything they said, in the guard's words"},
                 "zone": {"type": "string", "enum": tools.list_zones()},
+                "confirm_new": {"type": "boolean", "description": "Only true after the guard confirmed it is a different child from an open found child"},
             }, "required": ["description", "zone"]},
+        }},
+        {"type": "function", "function": {
+            "name": "pick_up_found_child",
+            "description": "The guard has reached an existing found child (a case from found_children_waiting) and has the child now.",
+            "parameters": {"type": "object", "properties": {"case_id": {"type": "integer"}}, "required": ["case_id"]},
         }},
         {"type": "function", "function": {
             "name": "my_sightings",
@@ -165,10 +179,15 @@ def run_tool(name: str, raw_args: str, guard: str, said: list[str] | None = None
         return result
     if name == "report_found_child":
         text = sighting_text(args.get("description", ""), guard, said or [])
-        result = tools.report_found_child(text, args.get("zone", ""), reporter)
-        if "error" not in result:
+        result = tools.report_found_child(text, args.get("zone", ""), reporter, bool(args.get("confirm_new")))
+        if "case_id" in result:
             db.log(result["case_id"], "Guard assistant", f"Filed a found-child report from Discord for {guard}")
         return result
+    if name == "pick_up_found_child":
+        try:
+            return tools.pick_up_found_child(int(args.get("case_id", 0)), f"{guard} (guard)")
+        except (TypeError, ValueError):
+            return {"error": "Which case number?"}
     if name == "my_sightings":
         return tools.sighting_status(reporter) or {"note": "You haven't filed any sightings yet."}
     if name == "list_zones":

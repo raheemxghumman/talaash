@@ -71,6 +71,8 @@ alter table cases add column if not exists photo_id int;
 alter table cases add column if not exists photo_today text;
 alter table cases add column if not exists report jsonb;
 alter table cases add column if not exists ip_key text;
+alter table cases add column if not exists collected_at timestamptz;
+alter table cases add column if not exists collected_by text;
 
 create table if not exists photos (
     id serial primary key,

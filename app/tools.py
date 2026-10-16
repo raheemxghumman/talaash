@@ -26,14 +26,27 @@ def list_zones() -> list[str]:
     return venue.names()
 
 
-def list_open_cases(zone: str | None = None) -> list[dict]:
-    """Active searches only. Reports still waiting for the officer are not shared."""
+def _found_summary(case: dict) -> dict:
+    """Found children are never described on open channels: where they are and who has them, nothing more."""
+    finder = (case["reporter_name"] or "a member of the public").split(" (")[0].split()[0]
+    return {
+        "found_child_case": case["id"],
+        "with": f"staff ({case['collected_by']})" if case["collected_at"] else f"finder {finder}",
+        "zone": case["zone"],
+        "status": "staff have the child, bring them to the desk" if case["collected_at"] else "waiting for staff to collect",
+    }
+
+
+def list_open_cases(zone: str | None = None) -> dict:
+    """Active searches and found children waiting for staff. Reports still waiting for the officer are not shared."""
     rows = db.all("select * from cases where status = 'active' and kind = 'missing' order by id desc")
     cases = [_summary(c) for c in rows]
+    found = [_found_summary(c) for c in db.all("select * from cases where status = 'active' and kind = 'found' order by id")]
     zone = venue.match_name(zone) if zone else None
     if zone:
         cases.sort(key=lambda c: c["last_seen_zone"] != zone)
-    return cases
+        found.sort(key=lambda c: c["zone"] != zone)
+    return {"missing_children": cases, "found_children_waiting": found}
 
 
 def get_case(case_id: int) -> dict:
@@ -41,8 +54,9 @@ def get_case(case_id: int) -> dict:
     if not case or case["status"] not in ("active", "closed"):
         return {"error": f"No active or closed case #{case_id}."}
     if case["kind"] == "found":
-        return {"case_id": case_id, "kind": "found child", "status": case["status"],
-                "note": "A found child. The desk officer handles it; details are not shared on open channels."}
+        if case["status"] == "closed":
+            return {"found_child_case": case_id, "status": "closed", "note": "Handed over. Stand down."}
+        return {**_found_summary(case), "note": "Details of found children are not shared on open channels."}
     if case["status"] == "closed":
         return {"case_id": case_id, "status": "closed", "note": "The child was found. Stand down."}
     # officer notes can hold private details, so they never leave the desk
@@ -78,7 +92,7 @@ def sighting_status(reporter: str) -> list[dict]:
              "filed": f"{r['created_at'].astimezone(config.VENUE_TZ):%H:%M}", "status": outcome.get(r["decision"]) or waiting[r["route"]]} for r in rows]
 
 
-def report_found_child(description: str, zone: str, reporter: str = "") -> dict:
+def report_found_child(description: str, zone: str, reporter: str = "", confirm_new: bool = False) -> dict:
     """A child found on their own, now with the reporter. The desk officer decides what happens next."""
     description = (description or "").strip()[:800]
     if len(description) < 8:
@@ -86,5 +100,22 @@ def report_found_child(description: str, zone: str, reporter: str = "") -> dict:
     zone = venue.match_name(zone)
     if not zone:
         return {"error": f"Unknown zone. Use one of: {', '.join(venue.names())}."}
+    if not confirm_new:
+        same = db.one("""select id from cases where kind = 'found' and status in ('review', 'active') and zone = %s
+                         and created_at > now() - interval '3 hours' order by id desc limit 1""", zone)
+        if same:
+            return {"possible_duplicate": same["id"],
+                    "ask_the_guard": f"Found child #{same['id']} is already open at {zone}. Is this the same child? "
+                                     "If they are collecting that child, use pick_up_found_child. Only if it is a different child, "
+                                     "call report_found_child again with confirm_new=true."}
     case_id, _ = desk.new_case(description, zone, reporter[:80], "", kind="found")
     return {"case_id": case_id, "outcome": "Filed as a found child. Stay with the child where you are; the desk officer will send staff."}
+
+
+def pick_up_found_child(case_id: int, staff: str) -> dict:
+    """A member of staff has reached a found child and has them now."""
+    error = desk.collect(case_id, staff)
+    if error:
+        return {"error": error}
+    return {"found_child_case": case_id, "outcome": "Logged: you have the child and the finder can go. "
+            "Bring the child to the security desk. The officer hands them over after an identity check."}

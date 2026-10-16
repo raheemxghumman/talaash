@@ -94,8 +94,8 @@
     const c = it.c, x = c.extracted || {};
     if (c.kind === "found" && (c.status === "review" || c.status === "active")) {
       return `<li class="item k-found" data-key="${it.key}">
-        <span class="t"><span class="tag tag-found">${c.status === "review" ? "Found child" : "Staff sent"}</span>#${c.id} ${esc(x.age_years != null || x.gender ? who({ ...x, child_name: null }) : "Child")}</span>
-        <span class="s">${esc(c.zone)} · with ${esc((c.reporter_name || "a finder").split(" ")[0])}</span>
+        <span class="t"><span class="tag tag-found">${c.status === "review" ? "Found child" : c.collected_at ? "With staff" : "Staff sent"}</span>#${c.id} ${esc(x.age_years != null || x.gender ? who({ ...x, child_name: null }) : "Child")}</span>
+        <span class="s">${esc(c.zone)} · ${c.collected_at ? "with " + esc(c.collected_by.split(" (")[0]) + ", find the parent" : "with " + esc((c.reporter_name || "a finder").split(" ")[0])}</span>
         <span class="r hot" data-since="${c.created_at}"></span></li>`;
     }
     if (c.status === "review") {
@@ -181,7 +181,7 @@
     const ev = data.events.filter((e) => e.case_id === c.id);
     const quiet = ev.filter((e) => e.action === "Note" || e.action === "Approved a PA announcement").length;
     const matches = matchesFor(c).map((m) => [m.id, m.decision]);
-    return JSON.stringify([sel, c.status, c.stage, c.sighted_at, c.alerts_sent, sights, c.status === "review" ? quiet : ev.length,
+    return JSON.stringify([sel, c.status, c.stage, c.sighted_at, c.collected_at, c.alerts_sent, sights, c.status === "review" ? quiet : ev.length,
       c.photo_id, !!c.photo_analysis, c.report?.summary || !!c.report, matches]);
   }
 
@@ -390,7 +390,7 @@
 
   function foundView(c) {
     const x = c.extracted || {}, v = c.verification || { issues: [] }, issues = v.issues || [], signals = v.signals || [];
-    const state = { review: "WAITING FOR STAFF", active: "STAFF SENT", closed: "HANDED OVER", rejected: "REJECTED" }[c.status];
+    const state = { review: "WAITING FOR STAFF", active: c.collected_at ? "WITH STAFF" : "STAFF SENT", closed: "HANDED OVER", rejected: "REJECTED" }[c.status];
     const finder = c.reporter_name || "a member of the public";
     const live = isOpen(c);
     return `
@@ -399,8 +399,10 @@
         <h1>${esc(x.age_years != null || x.gender ? who({ ...x, child_name: null }) : "A child on their own")}</h1>
         <div class="meta"><span>With <b>${esc(finder)}</b> at <b>${esc(c.zone)}</b></span><span>Reported <b data-ago="${c.created_at}"></b></span>${c.reporter_phone ? `<span>${esc(c.reporter_phone)}</span>` : ""}</div>
       </div></div>
-      ${live ? `<div class="safe-banner ${c.status}"><span class="sb-dot"></span><div><b>${c.status === "review" ? "A child is with a member of the public right now." : `Staff are on the way to ${esc(c.zone)}.`}</b>
-        <span>${c.status === "review" ? "Send staff first, then look for the parent." : "Bring the child to the desk. Hand them over only after the identity check."}</span></div></div>` : ""}
+      ${live ? `<div class="safe-banner ${c.collected_at ? "with-staff" : c.status}"><span class="sb-dot"></span><div><b>${c.status === "review" ? "A child is with a member of the public right now."
+          : c.collected_at ? `${esc(c.collected_by.split(" (")[0])} has the child. The finder has been told they can go.` : `Staff are on the way to ${esc(c.zone)}.`}</b>
+        <span>${c.status === "review" ? "Send staff first, then look for the parent." : c.collected_at ? "Now find the parent. Hand the child over only after the identity check." : "Mark it when a member of staff has the child, or a guard can tell the guard chat."}</span></div></div>` : ""}
+      ${c.status !== "rejected" ? `<div class="box">${foundStepper(c)}</div>` : ""}
       ${matchStrip(c)}
       <div class="grid2">
         <div class="box"><h4>Finder’s words</h4><p class="quote">${highlight(c.raw_report, issues.map((i) => i.quote))}</p></div>
@@ -419,7 +421,18 @@
       ${c.status === "rejected" ? `<div class="box"><h4>Reason</h4><p class="quote">${esc(c.close_note || "No reason given")}</p></div>` : ""}
       <div class="box"><h4>Timeline</h4>${timelineHtml(c.id)}</div>
       ${c.status === "review" ? `<div class="decide"><span class="hint-l">Staff are told where to go. Nothing about the child is posted.</span><button class="btn ghost" data-act="reject">Reject</button><button class="btn sage" data-act="dispatch">Send staff <span class="k">A</span></button></div>`
-        : c.status === "active" ? `<div class="decide"><span class="hint-l">Reunite through a match. Close here only if the child went to police or another service.</span><button class="btn ghost" data-act="found">Close without a match</button></div>` : ""}`;
+        : c.status === "active" ? `<div class="decide"><span class="hint-l">${c.collected_at ? "Reunite through a match. Close here only if the child went to police or another service." : "When a member of staff reaches the child, mark it here."}</span><button class="btn ghost" data-act="found">Close without a match</button>${c.collected_at ? "" : '<button class="btn sage" data-act="collect">Staff have the child <span class="k">A</span></button>'}</div>` : ""}`;
+  }
+
+  function foundStepper(c) {
+    const reunited = eventTime(c.id, /^Handed the child/);
+    const steps = [["Reported", c.created_at, true], ["Staff sent", c.approved_at, !!c.approved_at],
+      ["With staff", c.collected_at, !!c.collected_at], [reunited ? "Reunited" : "Closed", c.closed_at, c.status === "closed"]];
+    const current = c.status === "closed" ? 3 : c.collected_at ? 3 : c.approved_at ? 2 : 1;
+    return `<div class="stepper s4">${steps.map(([label, at, done], i) => {
+      const cls = c.status === "closed" ? (i === 3 ? "good" : done ? "done" : "") : i < current && done ? "done" : i === current ? "now" : "";
+      return `<div class="${cls}">${label}<small>${at && done ? hm(at) : "&nbsp;"}</small></div>`;
+    }).join("")}</div>`;
   }
 
   const CHECKS = [["described", "The parent described the child in their own words before seeing them"],
@@ -659,6 +672,11 @@
         await post(`/api/cases/${c.id}/dispatch`);
         toast(`Staff sent to ${c.zone}. Nothing about the child was posted.`);
         await refresh(); select(`c:${c.id}`);
+      } else if (what === "collect") {
+        btn.disabled = true;
+        await post(`/api/cases/${c.id}/collect`);
+        toast(`Logged: staff have found child #${c.id}. The finder’s page now says they can go.`);
+        await refresh(); select(`c:${c.id}`);
       } else if (what === "reject") {
         const reason = await ask("Reject this report?", c.kind === "found" ? "No staff will be sent. Say why, for the log." : "Nothing will be broadcast. Say why, for the log.", "", "Reject report");
         if (reason === null) return;
@@ -878,7 +896,7 @@
     const i = items.findIndex((li) => li.dataset.key === sel);
     if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); const n = items[Math.min(i + 1, items.length - 1)]; n && select(n.dataset.key, false); }
     else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); const n = items[Math.max(i - 1, 0)]; n && select(n.dataset.key, false); }
-    else if (e.key === "a") $('#detail [data-act="approve"]:not(:disabled), #detail [data-act="dispatch"]:not(:disabled)')?.click();
+    else if (e.key === "a") $('#detail [data-act="approve"]:not(:disabled), #detail [data-act="dispatch"]:not(:disabled), #detail [data-act="collect"]:not(:disabled)')?.click();
     else if (e.key === "c") $('#detail [data-act="confirm"]')?.click();
     else if (e.key === "f") $('#detail [data-act="found"]')?.click();
   });

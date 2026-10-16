@@ -239,12 +239,13 @@ def reunite(match_id: int, officer: str, note: str, identity_checked: bool) -> s
 
 def public_status(token: str):
     """What a parent or finder may see about their own report: progress only, no details."""
-    case = db.one("select id, kind, status, stage, zone, created_at, approved_at, sighted_at, closed_at "
+    case = db.one("select id, kind, status, stage, zone, created_at, approved_at, sighted_at, closed_at, collected_at "
                   "from cases where public_token = %s", token)
     if not case:
         return None
     if case["kind"] == "found":
-        step = {"review": "checking", "active": "dispatched", "closed": "reunited", "rejected": "rejected"}[case["status"]]
+        step = {"review": "checking", "active": "collected" if case["collected_at"] else "dispatched",
+                "closed": "reunited", "rejected": "rejected"}[case["status"]]
     elif case["status"] == "review":
         step = "checking"
     elif case["status"] == "rejected":
@@ -310,6 +311,27 @@ def dispatch(case_id: int, officer: str) -> bool:
                 fields=[{"name": "Where", "value": case["zone"], "inline": True},
                         {"name": "Next", "value": "Bring the child to the security desk", "inline": True}])
     return True
+
+
+def collect(case_id: int, who: str) -> str | None:
+    """A member of staff has reached the finder and has the child. Returns an error, or None.
+    Guards may report this; handing the child to a parent still needs the officer's identity check."""
+    case = get_case(case_id)
+    if not case or case["kind"] != "found":
+        return f"Case #{case_id} is not a found child."
+    if case["status"] == "review":
+        return f"The officer hasn't sent staff for found child #{case_id} yet."
+    if case["status"] != "active":
+        return f"Found child #{case_id} is already {'closed' if case['status'] == 'closed' else case['status']}."
+    if case["collected_at"]:
+        return f"Staff already have found child #{case_id} ({case['collected_by']})."
+    db.run("update cases set collected_at = now(), collected_by = %s where id = %s and collected_at is null", who[:80], case_id)
+    db.log(case_id, who, "Has the child, the finder can go", f"at {case['zone']}")
+    notify.send(case, "desk", "found", f"CHILD WITH STAFF · Found child #{case_id}",
+                f"**{who}** has the found child from {case['zone']}. No one else needs to go. Bring the child to the security desk.",
+                fields=[{"name": "Where", "value": case["zone"], "inline": True},
+                        {"name": "Next", "value": "Security desk, then the identity check", "inline": True}])
+    return None
 
 
 def reject(case_id: int, officer: str, reason: str) -> bool:
@@ -458,7 +480,7 @@ def build_report(case_id: int):
     report = {
         "kind": c["kind"], "zone": c["zone"], "how": how, "match_id": match["id"] if match else None,
         "approval_seconds": _secs(c["created_at"], c["approved_at"]),
-        "to_sighting_seconds": _secs(c["approved_at"], c["sighted_at"]),
+        "to_sighting_seconds": _secs(c["approved_at"], c["sighted_at"] or c.get("collected_at")),
         "total_seconds": _secs(c["created_at"], c["closed_at"]),
         "stage_reached": (["Zone", "All zones", "Police"][c["stage"]] if c["approved_at"] and c["kind"] == "missing"
                           else "Staff sent" if c["approved_at"] else "Not broadcast"),
@@ -486,6 +508,8 @@ def report_lines(c: dict, r: dict) -> list[str]:
         lines.append(f"The officer {'sent staff' if found else 'approved the broadcast'} {_fmt(r['approval_seconds'])} after the report.")
     else:
         lines.append("Nothing was broadcast to guards.")
+    if found and r["to_sighting_seconds"] is not None:
+        lines.append(f"Staff reached the child {_fmt(r['to_sighting_seconds'])} after being sent.")
     if not found and r["approval_seconds"] is not None:
         lines.append(f"The search reached this stage: {r['stage_reached']}.")
     if r["sightings"]:

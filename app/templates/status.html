@@ -12,6 +12,7 @@
       <li data-step="sent"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><div><b>Message received</b><span>The AI has read it and compared it with missing-child reports.</span></div></li>
       <li data-step="checking"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><div><b>Officer checking</b><span>A person reads it and decides who to send.</span></div></li>
       <li data-step="dispatched"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><div><b>Staff on the way to {{ status.zone }}</b><span>Stay where you are with the child.</span></div></li>
+      <li data-step="collected"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><div><b>Staff have the child</b><span>Thank you. You can carry on with your day.</span></div></li>
       <li data-step="reunited"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><div><b>Child handed over</b><span>The child is with security staff or their family.</span></div></li>
     </ol>
     <div class="advice" id="advice"><b>While you wait</b>Stay where you are with the child and keep your phone on. Don’t hand the child to anyone except venue staff.</div>
@@ -34,7 +35,7 @@
 <script>
 (() => {
   const found = {{ (status.kind == "found")|tojson }};
-  const order = found ? ["sent", "checking", "dispatched", "reunited"] : ["sent", "checking", "zone", "all_zones", "police", "found"];
+  const order = found ? ["sent", "checking", "dispatched", "collected", "reunited"] : ["sent", "checking", "zone", "all_zones", "police", "found"];
   const copy = {
     checking: ["The security desk has your report.", "An officer is checking it now. Guards are alerted as soon as they approve."],
     zone: ["Guards are searching.", "Security near {{ status.zone }} has your child’s description."],
@@ -44,6 +45,7 @@
     found: ["Your child has been found.", "Go to the security desk, or wait where you are and staff will bring you together."],
     rejected: ["Please go to the security desk.", "The officer needs to speak with you in person about this report."],
     dispatched: ["Staff are on their way.", "Stay at {{ status.zone }} with the child. A member of staff will come to you."],
+    collected: ["Staff have the child. Thank you.", "A member of staff has taken over. You can go; we may call if we need anything."],
     reunited: ["Thank you. The child is safe.", "Staff have taken over. You helped a family today."],
   };
   if (found) copy.checking = ["The security desk has your message.", "An officer is reading it now and will send staff to you."];
@@ -60,6 +62,7 @@
     const [h, sub] = copy[s.step] || copy.checking;
     document.getElementById("headline").textContent = h;
     document.getElementById("subline").textContent = sub;
+    if (s.step === "collected") document.getElementById("advice").innerHTML = "<b>All done on your side</b>Staff have the child and will look after them until the family is found. Thank you for staying.";
     if (s.step === "reunited") document.getElementById("advice").innerHTML = "<b>Done</b>Thank you for staying with the child until staff arrived.";
     if (s.step === "found") document.getElementById("advice").innerHTML = "<b>Found</b>Thank you for acting fast. All alerts about your child have been withdrawn.";
   }

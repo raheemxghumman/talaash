@@ -66,7 +66,8 @@ def test_keyring_skips_resting_keys():
 def test_agents_outside_the_desk_cannot_approve_or_close(monkeypatch):
     monkeypatch.setattr(venue, "names", lambda: ["Food Court", "Gate 3"])
     names = {t["function"]["name"] for t in guard_bot.tool_specs()}
-    assert names == {"list_open_cases", "get_case", "report_sighting", "report_found_child", "my_sightings", "list_zones"}
+    assert names == {"list_open_cases", "get_case", "report_sighting", "report_found_child", "pick_up_found_child",
+                     "my_sightings", "list_zones"}
     mcp_tools = set(mcp_server.mcp._tool_manager._tools)
     assert not {n for n in mcp_tools if any(w in n for w in ("approve", "close", "confirm", "reunite", "link", "dispatch", "note"))}
 

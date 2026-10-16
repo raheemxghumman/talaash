@@ -30,7 +30,7 @@ def list_zones() -> list[str]:
 
 
 @mcp.tool()
-def list_open_cases(zone: str | None = None) -> list[dict]:
+def list_open_cases(zone: str | None = None) -> dict:
     """Active lost-child searches (approved by the desk officer). Cases last seen in `zone` come first."""
     return tools.list_open_cases(zone)
 

@@ -311,6 +311,15 @@ def dispatch(case_id: int, request: Request):
     return {"ok": True}
 
 
+@app.post("/api/cases/{case_id}/collect")
+def collect(case_id: int, request: Request):
+    name = require_officer(request)
+    error = desk.collect(case_id, name)
+    if error:
+        raise HTTPException(409, error)
+    return {"ok": True}
+
+
 @app.post("/api/cases/{case_id}/notes")
 async def add_note(case_id: int, request: Request):
     name = require_officer(request)

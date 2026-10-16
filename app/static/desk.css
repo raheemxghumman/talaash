@@ -554,3 +554,6 @@ input, textarea, select { color: var(--ink); }
 .lightbox { background: transparent; }
 .ms-top .tag { font: 600 10.5px var(--sans); letter-spacing: .05em; text-transform: uppercase; padding: 3px 7px; border-radius: 5px; }
 .ms-top .tag-signal { background: var(--signal-soft); color: var(--signal-deep); }
+.safe-banner.with-staff { background: #eef6f2; border-color: #b9d8cc; color: #1f4d42; }
+.safe-banner.with-staff .sb-dot { animation: none; }
+.stepper.s4 { grid-template-columns: repeat(4, 1fr); }
